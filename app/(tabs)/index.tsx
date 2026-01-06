@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import { StyleSheet, View, Text, Pressable, useWindowDimensions, useColorScheme } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
@@ -6,6 +6,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { runOnJS } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import * as Haptics from "expo-haptics";
 
 // Calculate days info for current year
 function getYearInfo() {
@@ -113,6 +114,7 @@ export default function LeftAltScreen() {
   const isDark = colorScheme === "dark";
   const { year, totalDays, dayOfYear, daysLeft } = getYearInfo();
   const [selectedDot, setSelectedDot] = useState<number | null>(null);
+  const lastHapticDot = useRef<number | null>(null);
 
   // Theme colors
   const colors = {
@@ -147,8 +149,14 @@ export default function LeftAltScreen() {
   const dotSize = Math.floor((availableWidth - (dotGap * (columns - 1))) / columns);
   const cellSize = dotSize + dotGap;
 
-  // Update selected dot from gesture
+  // Update selected dot from gesture with haptic feedback
   const updateSelectedDot = useCallback((index: number | null) => {
+    if (index !== null && index !== lastHapticDot.current) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      lastHapticDot.current = index;
+    } else if (index === null) {
+      lastHapticDot.current = null;
+    }
     setSelectedDot(index);
   }, []);
 

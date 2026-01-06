@@ -1,25 +1,24 @@
-import { StyleSheet, View, Text, ScrollView, Pressable, ImageBackground, useColorScheme } from "react-native";
+import { useState, useEffect, useCallback } from "react";
+import { StyleSheet, View, Text, ScrollView, Pressable, ImageBackground, useColorScheme, Modal, TextInput, Platform, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Svg, { Circle } from "react-native-svg";
+import { DatePicker, Host, ContextMenu, Button } from "@expo/ui/swift-ui";
+import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
+import Animated, { LinearTransition, FadeIn, FadeOut } from "react-native-reanimated";
+import { getSinceEvents, addSinceEvent, deleteSinceEvent, type SinceEvent, getSinceViewMode, setSinceViewMode, type ViewMode } from "../../utils/storage";
 
-// Demo since events
-const demoEvents = [
-  {
-    id: "1",
-    title: "Running",
-    startDate: new Date(2025, 11, 5), // Dec 5, 2025
-    image: "https://images.unsplash.com/photo-1556836459-d03e8a7c9c1c?w=800",
-    showProgress: true,
-  },
-  {
-    id: "2",
-    title: "Not drinking",
-    startDate: new Date(2025, 10, 25), // Nov 25, 2025
-    image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=800",
-    showProgress: false,
-  },
+// Sort options
+type SortType = "date_asc" | "date_desc" | "title_asc" | "title_desc";
+
+// Default placeholder images for events
+const placeholderImages = [
+  "https://images.unsplash.com/photo-1556836459-d03e8a7c9c1c?w=800",
+  "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=800",
+  "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800",
+  "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800",
 ];
 
 function formatDate(date: Date) {
@@ -133,17 +132,46 @@ function SinceCard({
   image,
   showProgress,
   onPress,
+  onLongPress,
+  compact = true,
 }: {
   title: string;
   startDate: Date;
   image: string;
-  showProgress: boolean;
+  showProgress?: boolean;
   onPress?: () => void;
+  onLongPress?: () => void;
+  compact?: boolean;
 }) {
   const daysSince = getDaysSince(startDate);
 
+  if (!compact) {
+    // List view - full width
+    return (
+      <Pressable onPress={onPress} onLongPress={onLongPress}>
+        <ImageBackground
+          source={{ uri: image }}
+          style={styles.sinceCardList}
+          imageStyle={styles.sinceCardImage}
+        >
+          <View style={styles.sinceCardOverlayList}>
+            <View style={styles.sinceCardContentList}>
+              <Text style={styles.sinceTitleTextList}>{title}</Text>
+              <Text style={styles.sinceDateTextList}>{formatDate(startDate)}</Text>
+            </View>
+            <View style={styles.sinceDaysContainerList}>
+              <Text style={styles.sinceDaysTextList}>{daysSince}</Text>
+              <Text style={styles.sinceDaysLabelList}>days</Text>
+            </View>
+          </View>
+        </ImageBackground>
+      </Pressable>
+    );
+  }
+
+  // Grid view - compact
   return (
-    <Pressable onPress={onPress} style={styles.sinceCardWrapper}>
+    <Pressable onPress={onPress} onLongPress={onLongPress}>
       <ImageBackground
         source={{ uri: image }}
         style={styles.sinceCard}
@@ -166,32 +194,270 @@ function SinceCard({
   );
 }
 
+// Add Event Modal
+function AddEventModal({
+  visible,
+  onClose,
+  onAdd,
+  isDark,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onAdd: (title: string, date: Date, image?: string) => void;
+  isDark: boolean;
+}) {
+  const [title, setTitle] = useState("");
+  const [selectedDate, setSelectedDate] = useState(() => new Date()); // Default to today
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const isGlassAvailable = isLiquidGlassAvailable();
+
+  const handleAdd = () => {
+    if (title.trim()) {
+      onAdd(title.trim(), selectedDate, selectedImage || undefined);
+      setTitle("");
+      setSelectedDate(new Date()); // Reset to today
+      setSelectedImage(null);
+      onClose();
+    }
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setSelectedImage(result.assets[0].uri);
+    }
+  };
+
+  const colors = {
+    background: isDark ? "#1C1C1E" : "#FFFFFF",
+    text: isDark ? "#FFFFFF" : "#000000",
+    secondaryText: isDark ? "#8E8E93" : "#8E8E93",
+    inputBg: isDark ? "#2C2C2E" : "#F2F2F7",
+  };
+
+  const HeaderButton = ({ onPress, disabled, children }: { onPress: () => void; disabled?: boolean; children: React.ReactNode }) => {
+    if (isGlassAvailable) {
+      return (
+        <Pressable onPress={onPress} disabled={disabled}>
+          <GlassView style={styles.headerGlassButton} isInteractive>
+            {children}
+          </GlassView>
+        </Pressable>
+      );
+    }
+    return (
+      <Pressable onPress={onPress} disabled={disabled} style={[styles.headerGlassButton, styles.headerButtonFallback]}>
+        {children}
+      </Pressable>
+    );
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        {/* Header */}
+        <View style={styles.modalHeader}>
+          <HeaderButton onPress={onClose}>
+            <Text style={[styles.modalHeaderButton, { color: "#007AFF" }]}>Cancel</Text>
+          </HeaderButton>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>New Habit</Text>
+          <HeaderButton onPress={handleAdd} disabled={!title.trim()}>
+            <Text style={[styles.modalHeaderButton, { color: title.trim() ? "#007AFF" : colors.secondaryText }]}>
+              Add
+            </Text>
+          </HeaderButton>
+        </View>
+
+        {/* Form */}
+        <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+          {/* Photo Picker */}
+          <View style={styles.inputSection}>
+            <Text style={[styles.inputLabel, { color: colors.secondaryText }]}>Habit Photo</Text>
+            <Pressable onPress={pickImage} style={[styles.photoPicker, { backgroundColor: colors.inputBg }]}>
+              {selectedImage ? (
+                <Image source={{ uri: selectedImage }} style={styles.selectedPhoto} />
+              ) : (
+                <View style={styles.photoPlaceholder}>
+                  <Ionicons name="image-outline" size={32} color={colors.secondaryText} />
+                  <Text style={[styles.photoPlaceholderText, { color: colors.secondaryText }]}>
+                    Tap to select photo
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
+
+          {/* Title Input */}
+          <View style={styles.inputSection}>
+            <Text style={[styles.inputLabel, { color: colors.secondaryText }]}>Habit Title</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.inputBg, color: colors.text }]}
+              placeholder="Enter habit title..."
+              placeholderTextColor={colors.secondaryText}
+              value={title}
+              onChangeText={setTitle}
+            />
+          </View>
+
+          {/* Date Picker */}
+          <View style={styles.inputSection}>
+            <Text style={[styles.inputLabel, { color: colors.secondaryText }]}>Start Date</Text>
+            {Platform.OS === "ios" ? (
+              <Host style={styles.datePickerHost}>
+                <DatePicker
+                  selection={selectedDate}
+                  onDateChange={setSelectedDate}
+                  range={{ end: new Date() }}
+                />
+              </Host>
+            ) : (
+              <Pressable style={[styles.dateButton, { backgroundColor: colors.inputBg }]}>
+                <Text style={{ color: colors.text }}>{selectedDate.toLocaleDateString()}</Text>
+              </Pressable>
+            )}
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
 export default function SinceScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const [events, setEvents] = useState<SinceEvent[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [sortType, setSortType] = useState<SortType>("date_desc");
+  const [viewMode, setViewMode] = useState<ViewMode>(() => getSinceViewMode());
+
+  const toggleViewMode = useCallback(() => {
+    const newMode = viewMode === "list" ? "grid" : "list";
+    setViewMode(newMode);
+    setSinceViewMode(newMode);
+  }, [viewMode]);
 
   const colors = {
     background: isDark ? "#000000" : "#FFFFFF",
     text: isDark ? "#FFFFFF" : "#000000",
   };
 
+  // Sort events based on current sort type
+  const sortedEvents = [...events]
+    .map((event) => ({
+      ...event,
+      dateObj: new Date(event.startDate),
+    }))
+    .sort((a, b) => {
+      switch (sortType) {
+        case "date_asc":
+          return a.dateObj.getTime() - b.dateObj.getTime();
+        case "date_desc":
+          return b.dateObj.getTime() - a.dateObj.getTime();
+        case "title_asc":
+          return a.title.localeCompare(b.title);
+        case "title_desc":
+          return b.title.localeCompare(a.title);
+        default:
+          return b.dateObj.getTime() - a.dateObj.getTime();
+      }
+    });
+
+  // Load events from MMKV
+  useEffect(() => {
+    const loadEvents = () => {
+      const storedEvents = getSinceEvents();
+      setEvents(storedEvents);
+    };
+    loadEvents();
+  }, []);
+
+  // Add new event
+  const handleAddEvent = useCallback((title: string, date: Date, image?: string) => {
+    const eventImage = image || placeholderImages[Math.floor(Math.random() * placeholderImages.length)];
+    const newEvent = addSinceEvent({
+      title,
+      startDate: date.toISOString(),
+      image: eventImage,
+    });
+    setEvents((prev) => [...prev, newEvent]);
+  }, []);
+
+  // Delete event (on long press)
+  const handleDeleteEvent = useCallback((id: string) => {
+    deleteSinceEvent(id);
+    setEvents((prev) => prev.filter((e) => e.id !== id));
+  }, []);
+
+  // Open add modal
+  const openAddModal = () => setShowAddModal(true);
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <HeaderPillButton>
-            <Ionicons name="options-outline" size={20} color={colors.text} />
-          </HeaderPillButton>
-          <HeaderPillButton>
-            <Ionicons name="chatbubble-outline" size={18} color={colors.text} />
-            <Text style={[styles.exclamationMark, { color: colors.text }]}>!</Text>
+          {Platform.OS === "ios" ? (
+            <Host style={{ width: 44, height: 44 }}>
+              <ContextMenu activationMethod="singlePress">
+                <ContextMenu.Items>
+                  <Button
+                    label="Longest First"
+                    systemImage={sortType === "date_asc" ? "checkmark" : undefined}
+                    onPress={() => setSortType("date_asc")}
+                  />
+                  <Button
+                    label="Recent First"
+                    systemImage={sortType === "date_desc" ? "checkmark" : undefined}
+                    onPress={() => setSortType("date_desc")}
+                  />
+                  <Button
+                    label="Title A-Z"
+                    systemImage={sortType === "title_asc" ? "checkmark" : undefined}
+                    onPress={() => setSortType("title_asc")}
+                  />
+                  <Button
+                    label="Title Z-A"
+                    systemImage={sortType === "title_desc" ? "checkmark" : undefined}
+                    onPress={() => setSortType("title_desc")}
+                  />
+                </ContextMenu.Items>
+                <ContextMenu.Trigger>
+                  <View>
+                    <HeaderPillButton>
+                      <Ionicons name="options-outline" size={20} color={colors.text} />
+                    </HeaderPillButton>
+                  </View>
+                </ContextMenu.Trigger>
+              </ContextMenu>
+            </Host>
+          ) : (
+            <HeaderPillButton>
+              <Ionicons name="options-outline" size={20} color={colors.text} />
+            </HeaderPillButton>
+          )}
+          <HeaderPillButton onPress={toggleViewMode}>
+            <Ionicons
+              name={viewMode === "grid" ? "list-outline" : "grid-outline"}
+              size={20}
+              color={colors.text}
+            />
           </HeaderPillButton>
         </View>
 
         <Text style={[styles.headerTitle, { color: colors.text }]}>Time since</Text>
 
-        <HeaderPillButton>
+        <HeaderPillButton onPress={openAddModal}>
           <Ionicons name="add" size={24} color={colors.text} />
         </HeaderPillButton>
       </View>
@@ -205,19 +471,49 @@ export default function SinceScreen() {
         {/* Info Banner */}
         <InfoBanner />
 
-        {/* Cards Grid */}
-        <View style={styles.cardsGrid}>
-          {demoEvents.map((event) => (
-            <SinceCard
-              key={event.id}
-              title={event.title}
-              startDate={event.startDate}
-              image={event.image}
-              showProgress={event.showProgress}
-            />
-          ))}
-        </View>
+        {/* Cards Grid/List */}
+        {events.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="time-outline" size={48} color={colors.text} style={{ opacity: 0.3 }} />
+            <Text style={[styles.emptyText, { color: colors.text }]}>No habits yet</Text>
+            <Text style={[styles.emptySubtext, { color: colors.text }]}>
+              Tap the + button to track a habit
+            </Text>
+          </View>
+        ) : (
+          <Animated.View
+            style={viewMode === "grid" ? styles.cardsGrid : styles.cardsList}
+            layout={LinearTransition.springify().damping(18).stiffness(120)}
+          >
+            {sortedEvents.map((event) => (
+              <Animated.View
+                key={`${event.id}-${viewMode}`}
+                layout={LinearTransition.springify().damping(18).stiffness(120)}
+                entering={FadeIn.duration(200)}
+                exiting={FadeOut.duration(150)}
+                style={viewMode === "grid" ? styles.sinceCardWrapper : styles.sinceCardWrapperList}
+              >
+                <SinceCard
+                  title={event.title}
+                  startDate={event.dateObj}
+                  image={event.image || placeholderImages[0]}
+                  compact={viewMode === "grid"}
+                  onPress={() => router.push(`/event/${event.id}`)}
+                  onLongPress={() => handleDeleteEvent(event.id)}
+                />
+              </Animated.View>
+            ))}
+          </Animated.View>
+        )}
       </ScrollView>
+
+      {/* Add Event Modal */}
+      <AddEventModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onAdd={handleAddEvent}
+        isDark={isDark}
+      />
     </SafeAreaView>
   );
 }
@@ -326,9 +622,16 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-between",
   },
+  cardsList: {
+    flexDirection: "column",
+  },
   sinceCardWrapper: {
     width: "48%",
     marginBottom: 16,
+  },
+  sinceCardWrapperList: {
+    width: "100%",
+    marginBottom: 12,
   },
   sinceCard: {
     height: 160,
@@ -376,5 +679,150 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 12,
     right: 12,
+  },
+  // List view styles
+  sinceCardList: {
+    height: 100,
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  sinceCardOverlayList: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sinceCardContentList: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  sinceTitleTextList: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 4,
+    textShadowColor: "rgba(0, 0, 0, 0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  sinceDateTextList: {
+    fontSize: 14,
+    color: "rgba(255, 255, 255, 0.85)",
+    textShadowColor: "rgba(0, 0, 0, 0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  sinceDaysContainerList: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingLeft: 16,
+  },
+  sinceDaysTextList: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    textShadowColor: "rgba(0, 0, 0, 0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  sinceDaysLabelList: {
+    fontSize: 12,
+    color: "rgba(255, 255, 255, 0.85)",
+    textTransform: "uppercase",
+    fontWeight: "600",
+    textShadowColor: "rgba(0, 0, 0, 0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  // Empty state
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 16,
+    opacity: 0.5,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    marginTop: 8,
+    opacity: 0.3,
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  headerGlassButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  headerButtonFallback: {
+    backgroundColor: "#F2F2F7",
+  },
+  modalHeaderButton: {
+    fontSize: 17,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  modalContent: {
+    padding: 20,
+  },
+  photoPicker: {
+    height: 140,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  selectedPhoto: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  photoPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  photoPlaceholderText: {
+    fontSize: 15,
+  },
+  inputSection: {
+    marginBottom: 24,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 8,
+    textTransform: "uppercase",
+  },
+  textInput: {
+    fontSize: 17,
+    padding: 16,
+    borderRadius: 12,
+  },
+  datePickerHost: {
+    width: "100%",
+    height: 350,
+  },
+  dateButton: {
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
   },
 });

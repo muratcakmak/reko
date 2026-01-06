@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { StyleSheet, View, Text, Pressable, Switch, useColorScheme, ActionSheetIOS, Platform } from "react-native";
+import { StyleSheet, View, Text, Pressable, Switch, useColorScheme, Platform } from "react-native";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import { router, useLocalSearchParams } from "expo-router";
 import Svg, { Path, Polygon } from "react-native-svg";
+import { Button, ContextMenu, Host } from "@expo/ui/swift-ui";
 
 // Type definitions
 type ThemeType = "Dark" | "Light";
@@ -130,7 +131,7 @@ function MiniDotGrid({
   shape: ShapeType;
 }) {
   const columns = 14;
-  const dotSize = 5;
+  const dotSize = 4;
   const gap = 2;
 
   const config = colorConfig[color];
@@ -167,13 +168,44 @@ const miniGridStyles = StyleSheet.create({
   },
 });
 
-// Picker button with chevron
-function PickerButton({ value, onPress }: { value: string; onPress?: () => void }) {
+// Menu picker using iOS ContextMenu (popover style)
+function MenuPicker<T extends string>({
+  value,
+  options,
+  onSelect,
+}: {
+  value: T;
+  options: readonly T[];
+  onSelect: (option: T) => void;
+}) {
+  if (Platform.OS !== "ios") {
+    // Fallback for non-iOS
+    return (
+      <Pressable style={styles.pickerButton}>
+        <Text style={styles.pickerValue}>{value}</Text>
+        <Text style={styles.pickerChevron}>⌃</Text>
+      </Pressable>
+    );
+  }
+
   return (
-    <Pressable style={styles.pickerButton} onPress={onPress}>
-      <Text style={styles.pickerValue}>{value}</Text>
-      <Text style={styles.pickerChevron}>⌃</Text>
-    </Pressable>
+    <Host style={{ width: 100, height: 40 }}>
+      <ContextMenu activationMethod="singlePress">
+        <ContextMenu.Items>
+          {options.map((option) => (
+            <Button
+              key={option}
+              label={option}
+              systemImage={option === value ? "checkmark" : undefined}
+              onPress={() => onSelect(option)}
+            />
+          ))}
+        </ContextMenu.Items>
+        <ContextMenu.Trigger>
+          <Button label={`${value} ▾`} />
+        </ContextMenu.Trigger>
+      </ContextMenu>
+    </Host>
   );
 }
 
@@ -232,57 +264,6 @@ export default function ShareScreen() {
   const isDark = theme === "Dark";
   const config = colorConfig[color];
 
-  // ActionSheet handlers
-  const showThemePicker = () => {
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ["Cancel", ...themeOptions],
-          cancelButtonIndex: 0,
-          title: "Theme",
-        },
-        (buttonIndex) => {
-          if (buttonIndex > 0) {
-            setTheme(themeOptions[buttonIndex - 1]);
-          }
-        }
-      );
-    }
-  };
-
-  const showColorPicker = () => {
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ["Cancel", ...colorOptions],
-          cancelButtonIndex: 0,
-          title: "Theme",
-        },
-        (buttonIndex) => {
-          if (buttonIndex > 0) {
-            setColor(colorOptions[buttonIndex - 1]);
-          }
-        }
-      );
-    }
-  };
-
-  const showShapePicker = () => {
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ["Cancel", ...shapeOptions],
-          cancelButtonIndex: 0,
-        },
-        (buttonIndex) => {
-          if (buttonIndex > 0) {
-            setShape(shapeOptions[buttonIndex - 1]);
-          }
-        }
-      );
-    }
-  };
-
   const handleShare = () => {
     // TODO: Implement actual share functionality
     console.log("Share pressed");
@@ -338,17 +319,20 @@ export default function ShareScreen() {
 
       {/* Pickers Row */}
       <View style={styles.pickersRow}>
-        <PickerButton
+        <MenuPicker
           value={theme}
-          onPress={showThemePicker}
+          options={themeOptions}
+          onSelect={setTheme}
         />
-        <PickerButton
+        <MenuPicker
           value={color}
-          onPress={showColorPicker}
+          options={colorOptions}
+          onSelect={setColor}
         />
-        <PickerButton
+        <MenuPicker
           value={shape}
-          onPress={showShapePicker}
+          options={shapeOptions}
+          onSelect={setShape}
         />
       </View>
 
@@ -382,18 +366,18 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   previewCard: {
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 14,
+    padding: 12,
     alignItems: "center",
-    marginBottom: 28,
+    marginBottom: 24,
   },
   previewYear: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: "600",
-    marginBottom: 12,
+    marginBottom: 8,
   },
   previewGridContainer: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   previewFooter: {
     flexDirection: "row",
@@ -402,7 +386,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   previewFooterText: {
-    fontSize: 11,
+    fontSize: 9,
     fontFamily: "Courier",
   },
   pickersRow: {

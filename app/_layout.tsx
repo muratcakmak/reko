@@ -51,7 +51,7 @@ export default function RootLayout() {
               title: "",
               presentation: isLiquidGlassAvailable() ? "formSheet" : "modal",
               sheetGrabberVisible: true,
-              sheetAllowedDetents: [0.8],
+              sheetAllowedDetents: [0.8, 1.0],
               contentStyle: {
                 backgroundColor: isLiquidGlassAvailable()
                   ? "transparent"
@@ -62,6 +62,22 @@ export default function RootLayout() {
                 : colorScheme === "dark"
                   ? "dark"
                   : "light",
+            }}
+          />
+          <Stack.Screen
+            name="settings"
+            options={{
+              headerTransparent: true,
+              headerShown: false,
+              title: "",
+              presentation: isLiquidGlassAvailable() ? "formSheet" : "modal",
+              sheetGrabberVisible: true,
+              sheetAllowedDetents: [0.6, 1.0],
+              contentStyle: {
+                backgroundColor: isLiquidGlassAvailable()
+                  ? "transparent"
+                  : "#F2F2F7",
+              },
             }}
           />
         </Stack>
