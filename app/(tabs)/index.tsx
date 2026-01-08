@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useRef, useEffect, memo } from "react";
-import { StyleSheet, View, Text, Pressable, useWindowDimensions, Platform, ScrollView } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { StyleSheet, View, Text, Pressable, useWindowDimensions, Platform } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
@@ -349,7 +349,8 @@ const DotGrid = memo(function DotGrid({
 
 // Main component
 export default function LeftScreen() {
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { isDark, colors: themeColors } = useTheme();
   const [viewConfig, setViewConfig] = useState<ViewConfig>({ type: "year" });
   const [sinceEvents, setSinceEvents] = useState<SinceEvent[]>([]);
@@ -421,18 +422,37 @@ export default function LeftScreen() {
     });
   }, [label, timeLeftText, total, passed, viewConfig.type]);
 
-  // Memoized grid dimensions
+  // Memoized grid dimensions - calculate to fit all dots in fixed container
   const gridDimensions = useMemo(() => {
     const cardPadding = 24;
     const cardMargin = 20;
+    const headerHeight = 70; // Header with pills
+    const tabBarHeight = 100 + insets.bottom; // Floating glass tab bar + safe area bottom + spacing
+
     const availableWidth = screenWidth - (cardMargin * 2) - (cardPadding * 2);
-    const dotGap = viewConfig.type === "now" || viewConfig.type === "today" ? 12 : 8;
-    const calculatedDotSize = Math.floor((availableWidth - (dotGap * (columns - 1))) / columns);
-    const dotSize = Math.min(calculatedDotSize, 24);
+    const availableHeight = screenHeight - headerHeight - tabBarHeight - insets.top - (cardMargin * 2) - (cardPadding * 2);
+
+    // Calculate rows needed
+    const rows = Math.ceil(total / columns);
+
+    // Calculate dot size based on available space
+    const baseGap = viewConfig.type === "now" || viewConfig.type === "today" ? 10 : 6;
+
+    // Calculate maximum dot size that fits width
+    const maxDotSizeByWidth = Math.floor((availableWidth - (baseGap * (columns - 1))) / columns);
+
+    // Calculate maximum dot size that fits height
+    const maxDotSizeByHeight = Math.floor((availableHeight - (baseGap * (rows - 1))) / rows);
+
+    // Use the smaller of the two, with a reasonable max cap
+    const dotSize = Math.min(maxDotSizeByWidth, maxDotSizeByHeight, 28);
+    const dotGap = baseGap;
     const cellSize = dotSize + dotGap;
     const gridWidth = columns * dotSize + (columns - 1) * dotGap;
-    return { dotGap, dotSize, cellSize, gridWidth };
-  }, [screenWidth, columns, viewConfig.type]);
+    const gridHeight = rows * dotSize + (rows - 1) * dotGap;
+
+    return { dotGap, dotSize, cellSize, gridWidth, gridHeight, rows };
+  }, [screenWidth, screenHeight, columns, total, viewConfig.type, insets.top, insets.bottom]);
 
   const { dotGap, dotSize, cellSize, gridWidth } = gridDimensions;
 
@@ -509,11 +529,7 @@ export default function LeftScreen() {
   const setYearView = useCallback(() => setViewConfig({ type: "year" }), []);
 
   const gridContent = (
-    <ScrollView
-      style={styles.dotsScrollView}
-      contentContainerStyle={styles.dotsScrollContent}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={styles.dotsContainer}>
       <GestureDetector gesture={panGesture}>
         <Animated.View
           key={viewKey}
@@ -540,7 +556,7 @@ export default function LeftScreen() {
           />
         </Animated.View>
       </GestureDetector>
-    </ScrollView>
+    </View>
   );
 
   return (
@@ -653,18 +669,15 @@ const styles = StyleSheet.create({
   cardContainer: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 100, // Account for floating tab bar
   },
   gridCard: {
     flex: 1,
     borderRadius: 24,
     overflow: "hidden",
   },
-  dotsScrollView: {
+  dotsContainer: {
     flex: 1,
-  },
-  dotsScrollContent: {
-    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
