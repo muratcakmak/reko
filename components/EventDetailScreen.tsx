@@ -165,13 +165,13 @@ const CalendarSection = React.memo(function CalendarSection({ targetDate, isAhea
     const now = Date.now();
     return isAhead
       ? {
-          start: new Date(now),
-          end: new Date(now + 10 * 365 * 24 * 60 * 60 * 1000),
-        }
+        start: new Date(now),
+        end: new Date(now + 10 * 365 * 24 * 60 * 60 * 1000),
+      }
       : {
-          start: new Date(now - 50 * 365 * 24 * 60 * 60 * 1000),
-          end: new Date(now),
-        };
+        start: new Date(now - 50 * 365 * 24 * 60 * 60 * 1000),
+        end: new Date(now),
+      };
   }, [isAhead]);
 
   // Memoize card style to prevent object recreation
@@ -481,12 +481,12 @@ export function EventDetailScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
-          <HeaderPillButton style={styles.actionButton}>
+          {/* <HeaderPillButton style={styles.actionButton}>
             <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
           </HeaderPillButton>
           <HeaderPillButton style={styles.actionButton}>
             <Ionicons name="share-outline" size={20} color="#FFFFFF" />
-          </HeaderPillButton>
+          </HeaderPillButton> */}
         </View>
       </ScrollView>
     </View>
