@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { StyleSheet, View, Text, Pressable, ScrollView } from "react-native";
+import { StyleSheet, View, Text, Pressable, ScrollView, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { SymbolView } from "expo-symbols";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { getUserProfile, useAccentColor, type AccentColor, getLifespan } from "../../utils/storage";
@@ -54,12 +55,30 @@ function PreciseCountdown({
 
   return (
     <View style={styles.countdownContainer}>
-      <Ionicons name="leaf-outline" size={24} color={secondaryTextColor} style={styles.laurelIcon} />
+      {Platform.OS === "ios" ? (
+        <SymbolView
+          name="laurel.leading"
+          size={40}
+          tintColor={secondaryTextColor}
+          style={styles.laurelIcon}
+        />
+      ) : (
+        <Ionicons name="leaf-outline" size={24} color={secondaryTextColor} style={styles.laurelIcon} />
+      )}
       <View style={styles.countdownContent}>
         <Text style={[styles.countdownValue, { color: textColor }]}>{timeLeft}</Text>
         <Text style={[styles.countdownLabel, { color: secondaryTextColor }]}>years left</Text>
       </View>
-      <Ionicons name="leaf-outline" size={24} color={secondaryTextColor} style={[styles.laurelIcon, { transform: [{ scaleX: -1 }] }]} />
+      {Platform.OS === "ios" ? (
+        <SymbolView
+          name="laurel.trailing"
+          size={40}
+          tintColor={secondaryTextColor}
+          style={styles.laurelIcon}
+        />
+      ) : (
+        <Ionicons name="leaf-outline" size={24} color={secondaryTextColor} style={[styles.laurelIcon, { transform: [{ scaleX: -1 }] }]} />
+      )}
     </View>
   );
 }

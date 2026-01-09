@@ -127,7 +127,8 @@ function AddEventModal({
         </Pressable>
 
         {/* Form Content */}
-        <View style={styles.formContent}>
+        {/* Form Content */}
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.formContent}>
           {/* Title Input */}
           <View style={styles.inputSection}>
             <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Event Title</Text>
@@ -163,7 +164,7 @@ function AddEventModal({
               </Pressable>
             )}
           </View>
-        </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -343,10 +344,8 @@ export default function AheadScreen() {
                   subtitle={formatDate(event.dateObj)}
                   image={event.image}
                   compact={viewMode === "grid"}
-                // Reuse existing card background logic if needed, but TimeCard handles it.
                 />
               </Link.Trigger>
-              <Link.Preview />
               <Link.Menu>
                 <Link.MenuAction title="Show" icon="eye" onPress={() => handleShowEvent(event.id)} />
                 <Link.MenuAction
@@ -449,12 +448,15 @@ const createStyles = (theme: any) => StyleSheet.create({
     borderRadius: 12,
   },
   datePickerContainer: {
-    overflow: "visible",
-    minHeight: 480,
+    height: 380,
+    position: "relative",
   },
   datePickerHost: {
-    width: "100%",
-    height: 480,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 380,
   },
   dateButton: {
     padding: 16,
