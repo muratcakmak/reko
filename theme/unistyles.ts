@@ -55,7 +55,8 @@ function getInitialTheme(): 'light' | 'dark' {
     const mode = storedMode || 'device';
 
     if (mode === 'device') {
-        return Appearance.getColorScheme() || 'dark';
+        const colorScheme = Appearance.getColorScheme();
+        return colorScheme === 'light' ? 'light' : 'dark';
     }
     return mode;
 }

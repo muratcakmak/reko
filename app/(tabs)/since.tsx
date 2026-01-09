@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { StyleSheet, View, Text, ScrollView, Pressable, ImageBackground, Modal, TextInput, Platform, Image } from "react-native";
+import { StyleSheet, View, Text, ScrollView, Pressable, ImageBackground, Modal, TextInput, Platform, Image, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GlassView } from "expo-glass-effect";
 import { hasLiquidGlassSupport } from "../../utils/capabilities";
@@ -8,9 +8,9 @@ import Svg, { Circle } from "react-native-svg";
 import { DatePicker, Host, ContextMenu, Button, Divider } from "@expo/ui/swift-ui";
 import { datePickerStyle } from "@expo/ui/swift-ui/modifiers";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
+import { Link, router } from "expo-router";
 import Animated, { FadeIn, FadeOut, Layout, Easing } from "react-native-reanimated";
-import { getSinceEvents, addSinceEvent, type SinceEvent, getSinceViewMode, setSinceViewMode, saveImageLocally, type ViewMode } from "../../utils/storage";
+import { getSinceEvents, addSinceEvent, deleteSinceEvent, type SinceEvent, getSinceViewMode, setSinceViewMode, saveImageLocally, type ViewMode } from "../../utils/storage";
 import { useUnistyles } from "react-native-unistyles";
 
 // Sort options
@@ -73,19 +73,21 @@ function PillButton({
   onPress,
   style,
   fallbackColor,
+  disabled,
 }: {
   children: React.ReactNode;
   onPress?: () => void;
   style?: any;
   fallbackColor?: string;
+  disabled?: boolean;
 }) {
   const { theme } = useUnistyles();
   const isGlassAvailable = hasLiquidGlassSupport();
 
   if (isGlassAvailable) {
     return (
-      <Pressable onPress={onPress}>
-        <GlassView style={style} isInteractive>
+      <Pressable onPress={onPress} disabled={disabled}>
+        <GlassView style={[style, disabled && { opacity: 0.5 }]} isInteractive>
           {children}
         </GlassView>
       </Pressable>
@@ -93,7 +95,7 @@ function PillButton({
   }
 
   return (
-    <Pressable onPress={onPress} style={[{ backgroundColor: fallbackColor || theme.colors.card }, style]}>
+    <Pressable onPress={onPress} disabled={disabled} style={[{ backgroundColor: fallbackColor || theme.colors.card }, style, disabled && { opacity: 0.5 }]}>
       {children}
     </Pressable>
   );
@@ -125,13 +127,12 @@ function InfoBanner({ onPress }: { onPress?: () => void }) {
   );
 }
 
-// Event card with image background
+// Event card with image background (presentational only - no touch handling)
 function SinceCard({
   title,
   startDate,
   image,
   showProgress,
-  onPress,
   compact = true,
   cardBackgroundColor,
 }: {
@@ -139,7 +140,6 @@ function SinceCard({
   startDate: Date;
   image?: string;
   showProgress?: boolean;
-  onPress?: () => void;
   compact?: boolean;
   cardBackgroundColor: string;
 }) {
@@ -149,77 +149,69 @@ function SinceCard({
 
   if (!compact) {
     // List view - full width
-    return (
-      <Pressable onPress={onPress}>
-        {image ? (
-          <ImageBackground
-            source={{ uri: image }}
-            style={styles.sinceCardList}
-            imageStyle={styles.sinceCardImage}
-          >
-            <View style={styles.sinceCardOverlayList}>
-              <View style={styles.sinceCardContentList}>
-                <Text style={styles.sinceTitleTextList}>{title}</Text>
-                <Text style={styles.sinceDateTextList}>{formatDate(startDate)}</Text>
-              </View>
-              <View style={styles.sinceDaysContainerList}>
-                <Text style={styles.sinceDaysTextList}>{daysSince}</Text>
-                <Text style={styles.sinceDaysLabelList}>days</Text>
-              </View>
-            </View>
-          </ImageBackground>
-        ) : (
-          <View style={[styles.sinceCardList, { backgroundColor: cardBackgroundColor }]}>
-            <View style={styles.sinceCardOverlayList}>
-              <View style={styles.sinceCardContentList}>
-                <Text style={styles.sinceTitleTextList}>{title}</Text>
-                <Text style={styles.sinceDateTextList}>{formatDate(startDate)}</Text>
-              </View>
-              <View style={styles.sinceDaysContainerList}>
-                <Text style={styles.sinceDaysTextList}>{daysSince}</Text>
-                <Text style={styles.sinceDaysLabelList}>days</Text>
-              </View>
-            </View>
+    return image ? (
+      <ImageBackground
+        source={{ uri: image }}
+        style={styles.sinceCardList}
+        imageStyle={styles.sinceCardImage}
+      >
+        <View style={styles.sinceCardOverlayList}>
+          <View style={styles.sinceCardContentList}>
+            <Text style={styles.sinceTitleTextList}>{title}</Text>
+            <Text style={styles.sinceDateTextList}>{formatDate(startDate)}</Text>
           </View>
-        )}
-      </Pressable>
+          <View style={styles.sinceDaysContainerList}>
+            <Text style={styles.sinceDaysTextList}>{daysSince}</Text>
+            <Text style={styles.sinceDaysLabelList}>days</Text>
+          </View>
+        </View>
+      </ImageBackground>
+    ) : (
+      <View style={[styles.sinceCardList, { backgroundColor: cardBackgroundColor }]}>
+        <View style={styles.sinceCardOverlayList}>
+          <View style={styles.sinceCardContentList}>
+            <Text style={styles.sinceTitleTextList}>{title}</Text>
+            <Text style={styles.sinceDateTextList}>{formatDate(startDate)}</Text>
+          </View>
+          <View style={styles.sinceDaysContainerList}>
+            <Text style={styles.sinceDaysTextList}>{daysSince}</Text>
+            <Text style={styles.sinceDaysLabelList}>days</Text>
+          </View>
+        </View>
+      </View>
     );
   }
 
   // Grid view - compact
-  return (
-    <Pressable onPress={onPress}>
-      {image ? (
-        <ImageBackground
-          source={{ uri: image }}
-          style={styles.sinceCard}
-          imageStyle={styles.sinceCardImage}
-        >
-          <View style={styles.sinceCardOverlay}>
-            <View style={styles.sinceCardContent}>
-              <Text style={styles.sinceDaysText}>{daysSince} days</Text>
-              <Text style={styles.sinceDateText}>{formatDate(startDate)}</Text>
-              <Text style={styles.sinceTitleText}>{title}</Text>
-            </View>
-            {showProgress && (
-              <View style={styles.progressContainer}>
-                <ProgressRing progress={0} />
-              </View>
-            )}
-          </View>
-        </ImageBackground>
-      ) : (
-        <View style={[styles.sinceCard, { backgroundColor: cardBackgroundColor }]}>
-          <View style={styles.sinceCardOverlay}>
-            <View style={styles.sinceCardContent}>
-              <Text style={styles.sinceDaysText}>{daysSince} days</Text>
-              <Text style={styles.sinceDateText}>{formatDate(startDate)}</Text>
-              <Text style={styles.sinceTitleText}>{title}</Text>
-            </View>
-          </View>
+  return image ? (
+    <ImageBackground
+      source={{ uri: image }}
+      style={styles.sinceCard}
+      imageStyle={styles.sinceCardImage}
+    >
+      <View style={styles.sinceCardOverlay}>
+        <View style={styles.sinceCardContent}>
+          <Text style={styles.sinceDaysText}>{daysSince} days</Text>
+          <Text style={styles.sinceDateText}>{formatDate(startDate)}</Text>
+          <Text style={styles.sinceTitleText}>{title}</Text>
         </View>
-      )}
-    </Pressable>
+        {showProgress && (
+          <View style={styles.progressContainer}>
+            <ProgressRing progress={0} />
+          </View>
+        )}
+      </View>
+    </ImageBackground>
+  ) : (
+    <View style={[styles.sinceCard, { backgroundColor: cardBackgroundColor }]}>
+      <View style={styles.sinceCardOverlay}>
+        <View style={styles.sinceCardContent}>
+          <Text style={styles.sinceDaysText}>{daysSince} days</Text>
+          <Text style={styles.sinceDateText}>{formatDate(startDate)}</Text>
+          <Text style={styles.sinceTitleText}>{title}</Text>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -332,14 +324,19 @@ function AddEventModal({
           <View style={styles.inputSection}>
             <Text style={[styles.inputLabel, { color: secondaryTextColor }]}>Start Date</Text>
             {Platform.OS === "ios" ? (
-              <Host style={styles.datePickerHost}>
-                <DatePicker
-                  selection={selectedDate}
-                  onDateChange={setSelectedDate}
-                  range={{ end: new Date() }}
-                  modifiers={[datePickerStyle("graphical")]}
-                />
-              </Host>
+              <View style={styles.datePickerContainer}>
+                <Host style={styles.datePickerHost}>
+                  <DatePicker
+                    selection={selectedDate}
+                    onDateChange={setSelectedDate}
+                    range={{
+                      start: new Date(Date.now() - 50 * 365 * 24 * 60 * 60 * 1000), // 50 years ago
+                      end: new Date()
+                    }}
+                    modifiers={[datePickerStyle("graphical")]}
+                  />
+                </Host>
+              </View>
             ) : (
               <Pressable style={[styles.dateButton, { backgroundColor: inputBg }]}>
                 <Text style={{ color: textColor }}>{selectedDate.toLocaleDateString()}</Text>
@@ -403,6 +400,30 @@ export default function SinceScreen() {
       image: localImageUri,
     });
     setEvents((prev) => [...prev, newEvent]);
+  };
+
+  // Delete event with confirmation
+  const handleDeleteEvent = (id: string, title: string) => {
+    Alert.alert(
+      "Delete Event",
+      `Are you sure you want to delete "${title}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            deleteSinceEvent(id);
+            setEvents((prev) => prev.filter((e) => e.id !== id));
+          },
+        },
+      ]
+    );
+  };
+
+  // Navigate to event detail
+  const handleShowEvent = (id: string) => {
+    router.push(`/event/${id}`);
   };
 
   // Open add modal
@@ -504,14 +525,27 @@ export default function SinceScreen() {
                 exiting={FadeOut.duration(150).easing(Easing.in(Easing.quad))}
                 style={viewMode === "grid" ? styles.sinceCardWrapper : styles.sinceCardWrapperList}
               >
-                <SinceCard
-                  title={event.title}
-                  startDate={event.dateObj}
-                  image={event.image}
-                  compact={viewMode === "grid"}
-                  onPress={() => router.push(`/event/${event.id}`)}
-                  cardBackgroundColor={theme.colors.surface}
-                />
+                <Link href={`/event/${event.id}`} style={styles.cardLink}>
+                  <Link.Trigger style={styles.cardTrigger}>
+                    <SinceCard
+                      title={event.title}
+                      startDate={event.dateObj}
+                      image={event.image}
+                      compact={viewMode === "grid"}
+                      cardBackgroundColor={theme.colors.surface}
+                    />
+                  </Link.Trigger>
+                  <Link.Preview />
+                  <Link.Menu>
+                    <Link.MenuAction title="Show" icon="eye" onPress={() => handleShowEvent(event.id)} />
+                    <Link.MenuAction
+                      title="Delete"
+                      icon="trash"
+                      destructive
+                      onPress={() => handleDeleteEvent(event.id, event.title)}
+                    />
+                  </Link.Menu>
+                </Link>
               </Animated.View>
             ))}
           </View>
@@ -632,19 +666,28 @@ const createStyles = (theme: any) => StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+    paddingTop: 16,
   },
   cardsList: {
     flexDirection: "column",
+    paddingTop: 16,
   },
   sinceCardWrapper: {
-    width: "48%",
+    width: "47%",
     marginBottom: 16,
   },
   sinceCardWrapperList: {
     width: "100%",
     marginBottom: 12,
   },
+  cardLink: {
+    width: "100%",
+  },
+  cardTrigger: {
+    width: "100%",
+  },
   sinceCard: {
+    width: "100%",
     height: 160,
     borderRadius: 20,
     overflow: "hidden",
@@ -694,6 +737,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   // List view styles
   sinceCardList: {
+    width: "100%",
     height: 100,
     borderRadius: 20,
     overflow: "hidden",
@@ -828,9 +872,13 @@ const createStyles = (theme: any) => StyleSheet.create({
     padding: 16,
     borderRadius: 12,
   },
+  datePickerContainer: {
+    overflow: "visible",
+    minHeight: 400,
+  },
   datePickerHost: {
     width: "100%",
-    height: 350,
+    height: 400,
   },
   dateButton: {
     padding: 16,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { StyleSheet, View, Text, ScrollView, Pressable, ImageBackground, Modal, TextInput, Platform, Image } from "react-native";
+import { StyleSheet, View, Text, ScrollView, Pressable, ImageBackground, Modal, TextInput, Platform, Image, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GlassView } from "expo-glass-effect";
 import { hasLiquidGlassSupport } from "../../../utils/capabilities";
@@ -7,9 +7,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { DatePicker, Host, ContextMenu, Button, Divider } from "@expo/ui/swift-ui";
 import { datePickerStyle } from "@expo/ui/swift-ui/modifiers";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
+import { Link, router } from "expo-router";
 import Animated, { FadeIn, FadeOut, Layout, Easing } from "react-native-reanimated";
-import { getAheadEvents, addAheadEvent, getAheadViewMode, setAheadViewMode, saveImageLocally, type AheadEvent, type ViewMode } from "../../../utils/storage";
+import { getAheadEvents, addAheadEvent, deleteAheadEvent, getAheadViewMode, setAheadViewMode, saveImageLocally, type AheadEvent, type ViewMode } from "../../../utils/storage";
 import { useUnistyles } from "react-native-unistyles";
 
 // Sort options
@@ -39,19 +39,21 @@ function PillButton({
   onPress,
   style,
   fallbackColor,
+  disabled,
 }: {
   children: React.ReactNode;
   onPress?: () => void;
   style?: any;
   fallbackColor?: string;
+  disabled?: boolean;
 }) {
   const { theme } = useUnistyles();
   const isGlassAvailable = hasLiquidGlassSupport();
 
   if (isGlassAvailable) {
     return (
-      <Pressable onPress={onPress}>
-        <GlassView style={style} isInteractive>
+      <Pressable onPress={onPress} disabled={disabled}>
+        <GlassView style={[style, disabled && { opacity: 0.5 }]} isInteractive>
           {children}
         </GlassView>
       </Pressable>
@@ -59,25 +61,23 @@ function PillButton({
   }
 
   return (
-    <Pressable onPress={onPress} style={[{ backgroundColor: fallbackColor || theme.colors.card }, style]}>
+    <Pressable onPress={onPress} disabled={disabled} style={[{ backgroundColor: fallbackColor || theme.colors.card }, style, disabled && { opacity: 0.5 }]}>
       {children}
     </Pressable>
   );
 }
 
-// Event card with image background
+// Event card with image background (presentational only - no touch handling)
 function EventCard({
   title,
   date,
   image,
-  onPress,
   compact = false,
   cardBackgroundColor,
 }: {
   title: string;
   date: Date;
   image?: string;
-  onPress?: () => void;
   compact?: boolean;
   cardBackgroundColor: string;
 }) {
@@ -86,61 +86,53 @@ function EventCard({
   const daysUntil = getDaysUntil(date);
 
   if (compact) {
-    return (
-      <Pressable onPress={onPress}>
-        {image ? (
-          <ImageBackground
-            source={{ uri: image }}
-            style={styles.gridCard}
-            imageStyle={styles.gridCardImage}
-          >
-            <View style={styles.gridCardOverlay}>
-              <View style={styles.gridCardContent}>
-                <Text style={styles.gridDaysText}>In {daysUntil} days</Text>
-                <Text style={styles.gridDateText}>{formatDate(date)}</Text>
-                <Text style={styles.gridTitleText} numberOfLines={2}>{title}</Text>
-              </View>
-            </View>
-          </ImageBackground>
-        ) : (
-          <View style={[styles.gridCard, { backgroundColor: cardBackgroundColor }]}>
-            <View style={styles.gridCardContent}>
-              <Text style={styles.gridDaysText}>In {daysUntil} days</Text>
-              <Text style={styles.gridDateText}>{formatDate(date)}</Text>
-              <Text style={styles.gridTitleText} numberOfLines={2}>{title}</Text>
-            </View>
+    return image ? (
+      <ImageBackground
+        source={{ uri: image }}
+        style={styles.gridCard}
+        imageStyle={styles.gridCardImage}
+      >
+        <View style={styles.gridCardOverlay}>
+          <View style={styles.gridCardContent}>
+            <Text style={styles.gridDaysText}>In {daysUntil} days</Text>
+            <Text style={styles.gridDateText}>{formatDate(date)}</Text>
+            <Text style={styles.gridTitleText} numberOfLines={2}>{title}</Text>
           </View>
-        )}
-      </Pressable>
+        </View>
+      </ImageBackground>
+    ) : (
+      <View style={[styles.gridCard, { backgroundColor: cardBackgroundColor }]}>
+        <View style={styles.gridCardContent}>
+          <Text style={styles.gridDaysText}>In {daysUntil} days</Text>
+          <Text style={styles.gridDateText}>{formatDate(date)}</Text>
+          <Text style={styles.gridTitleText} numberOfLines={2}>{title}</Text>
+        </View>
+      </View>
     );
   }
 
-  return (
-    <Pressable onPress={onPress}>
-      {image ? (
-        <ImageBackground
-          source={{ uri: image }}
-          style={styles.eventCard}
-          imageStyle={styles.eventCardImage}
-        >
-          <View style={styles.eventCardOverlay}>
-            <View style={styles.eventCardContent}>
-              <Text style={styles.eventDaysText}>In {daysUntil} days</Text>
-              <Text style={styles.eventDateText}>{formatDate(date)}</Text>
-              <Text style={styles.eventTitleText}>{title}</Text>
-            </View>
-          </View>
-        </ImageBackground>
-      ) : (
-        <View style={[styles.eventCard, { backgroundColor: cardBackgroundColor }]}>
-          <View style={styles.eventCardContent}>
-            <Text style={[styles.eventDaysText, styles.noImageText]}>In {daysUntil} days</Text>
-            <Text style={[styles.eventDateText, styles.noImageText]}>{formatDate(date)}</Text>
-            <Text style={[styles.eventTitleText, styles.noImageText]}>{title}</Text>
-          </View>
+  return image ? (
+    <ImageBackground
+      source={{ uri: image }}
+      style={styles.eventCard}
+      imageStyle={styles.eventCardImage}
+    >
+      <View style={styles.eventCardOverlay}>
+        <View style={styles.eventCardContent}>
+          <Text style={styles.eventDaysText}>In {daysUntil} days</Text>
+          <Text style={styles.eventDateText}>{formatDate(date)}</Text>
+          <Text style={styles.eventTitleText}>{title}</Text>
         </View>
-      )}
-    </Pressable>
+      </View>
+    </ImageBackground>
+  ) : (
+    <View style={[styles.eventCard, { backgroundColor: cardBackgroundColor }]}>
+      <View style={styles.eventCardContent}>
+        <Text style={[styles.eventDaysText, styles.noImageText]}>In {daysUntil} days</Text>
+        <Text style={[styles.eventDateText, styles.noImageText]}>{formatDate(date)}</Text>
+        <Text style={[styles.eventTitleText, styles.noImageText]}>{title}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -254,14 +246,19 @@ function AddEventModal({
           <View style={styles.inputSection}>
             <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Event Date</Text>
             {Platform.OS === "ios" ? (
-              <Host style={styles.datePickerHost}>
-                <DatePicker
-                  selection={selectedDate}
-                  onDateChange={setSelectedDate}
-                  range={{ start: new Date(Date.now() + 24 * 60 * 60 * 1000) }}
-                  modifiers={[datePickerStyle("graphical")]}
-                />
-              </Host>
+              <View style={styles.datePickerContainer}>
+                <Host style={styles.datePickerHost}>
+                  <DatePicker
+                    selection={selectedDate}
+                    onDateChange={setSelectedDate}
+                    range={{
+                      start: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                      end: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000) // 10 years from now
+                    }}
+                    modifiers={[datePickerStyle("graphical")]}
+                  />
+                </Host>
+              </View>
             ) : (
               <Pressable style={[styles.dateButton, { backgroundColor: inputBg }]}>
                 <Text style={{ color: theme.colors.textPrimary }}>{selectedDate.toLocaleDateString()}</Text>
@@ -326,6 +323,30 @@ export default function AheadScreen() {
       image: localImageUri,
     });
     setEvents((prev) => [...prev, newEvent]);
+  };
+
+  // Delete event with confirmation
+  const handleDeleteEvent = (id: string, title: string) => {
+    Alert.alert(
+      "Delete Event",
+      `Are you sure you want to delete "${title}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            deleteAheadEvent(id);
+            setEvents((prev) => prev.filter((e) => e.id !== id));
+          },
+        },
+      ]
+    );
+  };
+
+  // Navigate to event detail
+  const handleShowEvent = (id: string) => {
+    router.push(`/event/${id}`);
   };
 
   // Open add modal
@@ -426,16 +447,29 @@ export default function AheadScreen() {
                 layout={Layout.duration(250).easing(Easing.out(Easing.quad))}
                 entering={FadeIn.duration(200).easing(Easing.out(Easing.quad))}
                 exiting={FadeOut.duration(150).easing(Easing.in(Easing.quad))}
-                style={viewMode === "grid" ? styles.gridCardWrapper : undefined}
+                style={viewMode === "grid" ? styles.gridCardWrapper : styles.listCardWrapper}
               >
-                <EventCard
-                  title={event.title}
-                  date={event.dateObj}
-                  image={event.image}
-                  onPress={() => router.push(`/event/${event.id}`)}
-                  compact={viewMode === "grid"}
-                  cardBackgroundColor={theme.colors.surface}
-                />
+                <Link href={`/event/${event.id}`} style={styles.cardLink}>
+                  <Link.Trigger style={styles.cardTrigger}>
+                    <EventCard
+                      title={event.title}
+                      date={event.dateObj}
+                      image={event.image}
+                      compact={viewMode === "grid"}
+                      cardBackgroundColor={theme.colors.surface}
+                    />
+                  </Link.Trigger>
+                  <Link.Preview />
+                  <Link.Menu>
+                    <Link.MenuAction title="Show" icon="eye" onPress={() => handleShowEvent(event.id)} />
+                    <Link.MenuAction
+                      title="Delete"
+                      icon="trash"
+                      destructive
+                      onPress={() => handleDeleteEvent(event.id, event.title)}
+                    />
+                  </Link.Menu>
+                </Link>
               </Animated.View>
             ))}
           </View>
@@ -507,6 +541,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     paddingBottom: 120,
   },
   eventCard: {
+    width: "100%",
     height: 160,
     borderRadius: theme.borderRadius.lg,
     overflow: "hidden",
@@ -553,17 +588,30 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   listContainer: {
     flexDirection: "column",
+    paddingTop: 16,
   },
   gridContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+    paddingTop: 16,
   },
   gridCardWrapper: {
-    width: "48%",
+    width: "47%",
     marginBottom: theme.spacing.md,
   },
+  listCardWrapper: {
+    width: "100%",
+    marginBottom: theme.spacing.md,
+  },
+  cardLink: {
+    width: "100%",
+  },
+  cardTrigger: {
+    width: "100%",
+  },
   gridCard: {
+    width: "100%",
     height: 160,
     borderRadius: theme.borderRadius.md,
     overflow: "hidden",
@@ -679,9 +727,13 @@ const createStyles = (theme: any) => StyleSheet.create({
     padding: 16,
     borderRadius: 12,
   },
+  datePickerContainer: {
+    overflow: "visible",
+    minHeight: 400,
+  },
   datePickerHost: {
     width: "100%",
-    height: 350,
+    height: 400,
   },
   dateButton: {
     padding: 16,

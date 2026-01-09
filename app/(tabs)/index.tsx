@@ -15,12 +15,25 @@ import Animated, {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import * as Haptics from "expo-haptics";
 import { Host, ContextMenu, Button, Divider } from "@expo/ui/swift-ui";
-import { getAheadEvents, getSinceEvents, getAccentColor, type AheadEvent, type SinceEvent, type AccentColor } from "../../utils/storage";
+import {
+  getAheadEvents,
+  getSinceEvents,
+  useAccentColor,
+  type AheadEvent,
+  type SinceEvent,
+  type AccentColor,
+  useLifeSymbol,
+  type LifeSymbol,
+  getUserProfile,
+  getLifespan,
+  useLifeUnit,
+  getLifeUnit,
+} from "../../utils/storage";
 import { accentColors } from "../../constants/theme";
 import { useUnistyles } from "react-native-unistyles";
 
 // View types
-type ViewType = "now" | "today" | "month" | "year" | "since" | "ahead";
+type ViewType = "now" | "today" | "month" | "year" | "life" | "since" | "ahead";
 
 interface ViewConfig {
   type: ViewType;
@@ -70,6 +83,46 @@ function getYearInfo() {
   return { total: totalDays, passed: dayOfYear, left: daysLeft, label: String(year) };
 }
 
+// Get life info
+function getLifeInfo() {
+  const profile = getUserProfile();
+  const lifespan = getLifespan();
+  const lifeUnit = getLifeUnit();
+  const birthDate = profile?.birthDate ? new Date(profile.birthDate) : new Date(new Date().getFullYear() - 25, 0, 1);
+  const now = new Date();
+
+  let total, passed, left, label;
+
+  if (lifeUnit === "weeks") {
+    total = lifespan * 52;
+    const diffTime = Math.abs(now.getTime() - birthDate.getTime());
+    const passedWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
+    passed = passedWeeks;
+    left = total - passed;
+    label = `${lifespan} Years`; // Keep label as Years generally? Or "In Weeks"? Let's stick to lifespan in years as title usually.
+  } else if (lifeUnit === "months") {
+    total = lifespan * 12;
+    passed = (now.getFullYear() - birthDate.getFullYear()) * 12 + (now.getMonth() - birthDate.getMonth());
+    left = total - passed;
+    label = `${lifespan} Years`;
+  } else {
+    // Years
+    total = lifespan;
+    passed = now.getFullYear() - birthDate.getFullYear();
+    // Adjust if birthday hasn't happened yet this year? 
+    // Simply year diff is simplest approximation for "dots".
+    left = total - passed;
+    label = `${lifespan} Years`;
+  }
+
+  return {
+    total,
+    passed,
+    left,
+    label
+  };
+}
+
 // Get since event info
 function getSinceEventInfo(event: SinceEvent) {
   const now = new Date();
@@ -103,6 +156,12 @@ function formatTimeLeft(left: number, viewType: ViewType, isCountdown?: boolean)
       return `${left} minutes left`;
     case "today":
       return `${left} hours left`;
+    case "life": {
+      const unit = getLifeUnit();
+      if (unit === "weeks") return `${left} Weeks left`;
+      if (unit === "months") return `${left} Months left`;
+      return `${left} Years left`;
+    }
     default:
       return `${left} days left`;
   }
@@ -138,6 +197,26 @@ function getDotLabel(dotIndex: number, viewType: ViewType, eventStartDate?: stri
       const date = new Date(startOfYear.getTime() + dotIndex * 24 * 60 * 60 * 1000);
       return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     }
+    case "life": {
+      // Show age based on unit
+      const profile = getUserProfile();
+      const birthDate = profile?.birthDate ? new Date(profile.birthDate) : new Date(now.getFullYear() - 25, 0, 1);
+      const unit = getLifeUnit();
+
+      if (unit === "weeks") {
+        const totalWeeks = dotIndex;
+        const years = Math.floor(totalWeeks / 52);
+        const weeks = totalWeeks % 52;
+        return `${years}y ${weeks}w`;
+      } else if (unit === "months") {
+        const totalMonths = dotIndex;
+        const ageYears = Math.floor(totalMonths / 12);
+        const ageMonths = totalMonths % 12;
+        return `${ageYears}y ${ageMonths}m`;
+      } else {
+        return `${dotIndex} Years Old`;
+      }
+    }
     case "since": {
       // Show days since start
       if (eventStartDate) {
@@ -166,6 +245,13 @@ function getColumns(viewType: ViewType, total: number): number {
     case "month":
       return 7;
     case "year":
+      return 14;
+    case "life": {
+      const unit = getLifeUnit();
+      if (unit === "weeks") return 52; // 52 weeks per year (good ratio for ~80 years)
+      if (unit === "months") return 24; // 24 months/row (2 years) -> fills screen better than 12
+      return 7; // ~70-90 years -> 7 cols gives ~10-13 rows (good vertical feel)
+    }
     case "since":
       return 14;
     case "ahead":
@@ -185,22 +271,67 @@ function StaticDot({
   size,
   passedColor,
   remainingColor,
+  symbol,
 }: {
   isPassed: boolean;
   size: number;
   passedColor: string;
   remainingColor: string;
+  symbol: LifeSymbol;
 }) {
-  return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor: isPassed ? passedColor : remainingColor,
-      }}
-    />
-  );
+  const color = isPassed ? passedColor : remainingColor;
+
+  switch (symbol) {
+    case "squares":
+      return (
+        <View
+          style={{
+            width: size,
+            height: size,
+            borderRadius: 2,
+            backgroundColor: color,
+          }}
+        />
+      );
+    case "diamonds":
+      return (
+        <View
+          style={{
+            width: size,
+            height: size,
+            backgroundColor: color,
+            transform: [{ rotate: "45deg" }, { scale: 0.8 }],
+            borderRadius: 1,
+          }}
+        />
+      );
+    case "stars":
+      return <Ionicons name="star" size={size} color={color} />;
+    case "hearts":
+      return <Ionicons name="heart" size={size} color={color} />;
+    case "hexagons":
+      return <Ionicons name="cube" size={size} color={color} />;
+    case "x":
+      return <Ionicons name="close" size={size} color={color} />;
+    case "hash":
+      return (
+        <Text style={{ fontSize: size * 0.9, color: color, fontWeight: "900", lineHeight: size }}>
+          #
+        </Text>
+      );
+    case "dots":
+    default:
+      return (
+        <View
+          style={{
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: color,
+          }}
+        />
+      );
+  }
 }
 
 // Selection highlight overlay - single animated component
@@ -274,6 +405,7 @@ function DotGrid({
   dotGap,
   passedColor,
   remainingColor,
+  symbol,
 }: {
   total: number;
   passed: number;
@@ -283,6 +415,7 @@ function DotGrid({
   dotGap: number;
   passedColor: string;
   remainingColor: string;
+  symbol: LifeSymbol;
 }) {
   // Pre-generate dot data
   const dots = Array.from({ length: total }, (_, i) => ({
@@ -306,9 +439,10 @@ function DotGrid({
         >
           <StaticDot
             isPassed={dot.isPassed}
-            size={dotSize - 2}
+            size={dotSize > 5 ? dotSize - 2 : dotSize}
             passedColor={passedColor}
             remainingColor={remainingColor}
+            symbol={symbol}
           />
         </View>
       ))}
@@ -326,7 +460,10 @@ export default function LeftScreen() {
   const styles = createStyles(theme);
 
   // Local state for accent color (replacing useTheme hook logic)
-  const [accentColorName] = useState<AccentColor>(() => getAccentColor());
+  const accentColorName = useAccentColor();
+  const lifeSymbol = useLifeSymbol();
+  // Listen to unit changes to force re-render
+  useLifeUnit();
   const accent = accentColors[accentColorName];
   // Determine if dark mode using Unistyles theme check? 
   // theme names in Unistyles are 'light', 'dark'. 
@@ -389,6 +526,8 @@ export default function LeftScreen() {
         return getMonthInfo();
       case "year":
         return getYearInfo();
+      case "life":
+        return getLifeInfo();
       case "since": {
         const event = sinceEvents.find(e => e.id === viewConfig.eventId);
         if (event) return getSinceEventInfo(event);
@@ -435,8 +574,18 @@ export default function LeftScreen() {
   // Calculate rows needed
   const rows = Math.ceil(total / columns);
 
-  // Calculate dot size based on available space
-  const baseGap = viewConfig.type === "now" || viewConfig.type === "today" ? 10 : 6;
+  // adaptive base gap for high density
+  const getBaseGap = () => {
+    if (viewConfig.type === "life") {
+      const unit = getLifeUnit();
+      if (unit === "weeks") return 1.5;
+      if (unit === "months") return 2;
+    }
+    if (viewConfig.type === "now" || viewConfig.type === "today") return 10;
+    return 6;
+  }
+
+  const baseGap = getBaseGap();
 
   // Calculate maximum dot size that fits width
   const maxDotSizeByWidth = Math.floor((availableWidth - (baseGap * (columns - 1))) / columns);
@@ -444,8 +593,14 @@ export default function LeftScreen() {
   // Calculate maximum dot size that fits height
   const maxDotSizeByHeight = Math.floor((availableHeight - (baseGap * (rows - 1))) / rows);
 
-  // Use the smaller of the two, with a reasonable max cap
-  const dotSize = Math.min(maxDotSizeByWidth, maxDotSizeByHeight, 28);
+  // Use the smaller of the two, with a reasonable max cap and SAFE MINIMUM
+  // Ensure dotSize is at least 2 to avoid layout breaking (rendering 0 size)
+  const dotSize = Math.max(2, Math.min(maxDotSizeByWidth, maxDotSizeByHeight, 28));
+
+  // If dotSize ends up small, reduce gap further to squeeze more? 
+  // For weeks view, gap might need to be 1 if density is extreme. 
+  // But let's stick to baseGap logic above for now.
+
   const dotGap = baseGap;
   const cellSize = dotSize + dotGap;
   const gridWidth = columns * dotSize + (columns - 1) * dotGap;
@@ -513,6 +668,7 @@ export default function LeftScreen() {
   const setTodayView = () => setViewConfig({ type: "today" });
   const setMonthView = () => setViewConfig({ type: "month" });
   const setYearView = () => setViewConfig({ type: "year" });
+  const setLifeView = () => setViewConfig({ type: "life" });
 
   const gridContent = (
     <View style={styles.dotsContainer}>
@@ -531,6 +687,7 @@ export default function LeftScreen() {
             dotGap={dotGap}
             passedColor={colors.passedDot}
             remainingColor={colors.remainingDot}
+            symbol={lifeSymbol}
           />
           <SelectionHighlight
             selectedDot={selectedDot}
@@ -557,6 +714,7 @@ export default function LeftScreen() {
                 <Button label="Today" systemImage="sun.max" onPress={setTodayView} />
                 <Button label="Month" systemImage="calendar" onPress={setMonthView} />
                 <Button label="Year" systemImage="calendar" onPress={setYearView} />
+                <Button label="Life" systemImage="heart.text.square" onPress={setLifeView} />
                 {(sinceEvents.length > 0 || aheadEvents.length > 0) && <Divider />}
                 {sinceEvents.map((event) => (
                   <Button
@@ -585,7 +743,18 @@ export default function LeftScreen() {
             </ContextMenu>
           </Host>
         ) : (
-          <AdaptivePillButton style={styles.pillButton}>
+          <AdaptivePillButton
+            style={styles.pillButton}
+            onPress={() => {
+              const types: ViewType[] = ["now", "today", "month", "year", "life"];
+              const currentIndex = types.indexOf(viewConfig.type as any);
+              if (currentIndex >= 0 && currentIndex < types.length - 1) {
+                setViewConfig({ type: types[currentIndex + 1] });
+              } else {
+                setNowView();
+              }
+            }}
+          >
             <Text style={[styles.labelText, { color: colors.text }]}>{label}</Text>
           </AdaptivePillButton>
         )}

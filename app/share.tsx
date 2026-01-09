@@ -5,6 +5,11 @@ import Svg, { Path, Polygon } from "react-native-svg";
 import { Button, ContextMenu, Host } from "@expo/ui/swift-ui";
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
+import {
+  getSharePreferences,
+  setSharePreferences,
+} from "../utils/storage";
+import * as Haptics from "expo-haptics";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -282,13 +287,49 @@ export default function ShareScreen() {
   const passed = parseInt(params.passed || "5", 10);
   const viewType = params.viewType || "year";
 
-  // Default theme based on system setting
-  const [theme, setTheme] = useState<ThemeType>(colorScheme === "dark" ? "Dark" : "Light");
-  const [color, setColor] = useState<ColorType>("Red");
-  const [shape, setShape] = useState<ShapeType>("Stars");
-  const [showTitle, setShowTitle] = useState(true);
-  const [showTimeLeft, setShowTimeLeft] = useState(true);
-  const [showRekoApp, setShowRekoApp] = useState(true);
+  // Load persistent preferences
+  const prefs = getSharePreferences();
+
+  // Default theme based on system setting if not previously saved? 
+  // Actually user asked to persist interactions, so we prioritize prefs.
+  const [theme, setTheme] = useState<ThemeType>(prefs.theme as ThemeType);
+  const [color, setColor] = useState<ColorType>(prefs.color as ColorType);
+  const [shape, setShape] = useState<ShapeType>(prefs.shape as ShapeType);
+  const [showTitle, setShowTitle] = useState(prefs.showTitle);
+  const [showTimeLeft, setShowTimeLeft] = useState(prefs.showTimeLeft);
+  const [showRekoApp, setShowRekoApp] = useState(prefs.showApp);
+
+  // Persistence wrappers
+  const handleThemeChange = (newTheme: ThemeType) => {
+    setTheme(newTheme);
+    setSharePreferences({ theme: newTheme });
+    Haptics.selectionAsync();
+  };
+  const handleColorChange = (newColor: ColorType) => {
+    setColor(newColor);
+    setSharePreferences({ color: newColor });
+    Haptics.selectionAsync();
+  };
+  const handleShapeChange = (newShape: ShapeType) => {
+    setShape(newShape);
+    setSharePreferences({ shape: newShape });
+    Haptics.selectionAsync();
+  };
+  const handleShowTitleChange = (val: boolean) => {
+    setShowTitle(val);
+    setSharePreferences({ showTitle: val });
+    Haptics.selectionAsync();
+  };
+  const handleShowTimeLeftChange = (val: boolean) => {
+    setShowTimeLeft(val);
+    setSharePreferences({ showTimeLeft: val });
+    Haptics.selectionAsync();
+  };
+  const handleShowRekoAppChange = (val: boolean) => {
+    setShowRekoApp(val);
+    setSharePreferences({ showApp: val });
+    Haptics.selectionAsync();
+  };
 
   const isDark = theme === "Dark";
   const config = colorConfig[color];
@@ -382,69 +423,69 @@ export default function ShareScreen() {
               styles.previewCard,
               { backgroundColor: previewBgColor }
             ]}>
-            {showTitle && (
-              <Text style={[
-                styles.previewYear,
-                { color: yearColor }
-              ]}>{label}</Text>
-            )}
-            <View style={[styles.previewGridContainer, !showTitle && { marginTop: 8 }]}>
-              <MiniDotGrid
-                total={total}
-                passed={passed}
-                viewType={viewType}
-                theme={theme}
-                color={color}
-                shape={shape}
-              />
-            </View>
-            {(showRekoApp || showTimeLeft) && (
-              <View style={styles.previewFooter}>
-                {showRekoApp ? (
-                  <Text style={[styles.previewFooterText, { color: footerColor }]}>
-                    left-time.app
-                  </Text>
-                ) : (
-                  <View />
-                )}
-                {showTimeLeft ? (
-                  <Text style={[styles.previewFooterText, { color: footerColor }]}>
-                    {timeLeftText}
-                  </Text>
-                ) : (
-                  <View />
-                )}
+              {showTitle && (
+                <Text style={[
+                  styles.previewYear,
+                  { color: yearColor }
+                ]}>{label}</Text>
+              )}
+              <View style={[styles.previewGridContainer, !showTitle && { marginTop: 8 }]}>
+                <MiniDotGrid
+                  total={total}
+                  passed={passed}
+                  viewType={viewType}
+                  theme={theme}
+                  color={color}
+                  shape={shape}
+                />
               </View>
-            )}
-          </View>
-        </ViewShot>
-      </Animated.View>
-    </Pressable>
+              {(showRekoApp || showTimeLeft) && (
+                <View style={styles.previewFooter}>
+                  {showRekoApp ? (
+                    <Text style={[styles.previewFooterText, { color: footerColor }]}>
+                      left-time.app
+                    </Text>
+                  ) : (
+                    <View />
+                  )}
+                  {showTimeLeft ? (
+                    <Text style={[styles.previewFooterText, { color: footerColor }]}>
+                      {timeLeftText}
+                    </Text>
+                  ) : (
+                    <View />
+                  )}
+                </View>
+              )}
+            </View>
+          </ViewShot>
+        </Animated.View>
+      </Pressable>
 
       {/* Pickers Row */}
       <View style={styles.pickersRow}>
         <MenuPicker
           value={theme}
           options={themeOptions}
-          onSelect={setTheme}
+          onSelect={handleThemeChange}
         />
         <MenuPicker
           value={color}
           options={colorOptions}
-          onSelect={setColor}
+          onSelect={handleColorChange}
         />
         <MenuPicker
           value={shape}
           options={shapeOptions}
-          onSelect={setShape}
+          onSelect={handleShapeChange}
         />
       </View>
 
       {/* Toggles Row */}
       <View style={styles.togglesRow}>
-        <ToggleItem label="Title" value={showTitle} onValueChange={setShowTitle} />
-        <ToggleItem label="Time left" value={showTimeLeft} onValueChange={setShowTimeLeft} />
-        <ToggleItem label="Left app" value={showRekoApp} onValueChange={setShowRekoApp} />
+        <ToggleItem label="Title" value={showTitle} onValueChange={handleShowTitleChange} />
+        <ToggleItem label="Time left" value={showTimeLeft} onValueChange={handleShowTimeLeftChange} />
+        <ToggleItem label="Left app" value={showRekoApp} onValueChange={handleShowRekoAppChange} />
       </View>
 
       {/* Share Button */}

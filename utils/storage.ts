@@ -177,6 +177,18 @@ export function deleteUserProfile(): void {
   storage.delete(USER_PROFILE_KEY);
 }
 
+// Lifespan Preference
+const LIFESPAN_KEY = "lifespan";
+
+export function getLifespan(): number {
+  const lifespan = storage.getNumber(LIFESPAN_KEY) ?? 0;
+  return lifespan > 0 ? lifespan : 75; // Default to 75
+}
+
+export function setLifespan(years: number): void {
+  storage.set(LIFESPAN_KEY, years);
+}
+
 // Sync existing events to widget storage (call on app start)
 export function syncAllEventsToWidget(): void {
   if (Platform.OS !== "ios") return;
@@ -277,4 +289,112 @@ export function getAccentColor(): AccentColor {
 
 export function setAccentColor(color: AccentColor): void {
   storage.set(ACCENT_COLOR_KEY, color);
+}
+
+// Reactive hook for accent color
+import { useState, useEffect } from "react";
+
+export function useAccentColor(): AccentColor {
+  const [color, setColor] = useState<AccentColor>(getAccentColor());
+
+  useEffect(() => {
+    // Update state if storage changes elsewhere (though MMKV is synchronous)
+    // We listen to the specific key
+    const listener = storage.addOnValueChangedListener((key) => {
+      if (key === ACCENT_COLOR_KEY) {
+        setColor(getAccentColor());
+      }
+    });
+
+    return () => {
+      listener.remove();
+    };
+  }, []);
+
+  return color;
+}
+
+// Life Symbol Preference
+export type LifeSymbol = "dots" | "squares" | "stars" | "diamonds" | "hearts" | "hexagons" | "x" | "hash";
+
+const LIFE_SYMBOL_KEY = "life_symbol";
+
+export function getLifeSymbol(): LifeSymbol {
+  const symbol = storage.getString(LIFE_SYMBOL_KEY);
+  return (symbol as LifeSymbol) || "dots";
+}
+
+export function setLifeSymbol(symbol: LifeSymbol): void {
+  storage.set(LIFE_SYMBOL_KEY, symbol);
+}
+
+export function useLifeSymbol(): LifeSymbol {
+  const [symbol, setSymbol] = useState<LifeSymbol>(getLifeSymbol());
+
+  useEffect(() => {
+    const listener = storage.addOnValueChangedListener((key) => {
+      if (key === LIFE_SYMBOL_KEY) {
+        setSymbol(getLifeSymbol());
+      }
+    });
+
+    return () => {
+      listener.remove();
+    };
+  }, []);
+
+  return symbol;
+}
+
+export function useLifeUnit(): LifeUnit {
+  const [unit, setUnit] = useState<LifeUnit>(getLifeUnit());
+
+  useEffect(() => {
+    const listener = storage.addOnValueChangedListener((key) => {
+      if (key === LIFE_UNIT_KEY) {
+        setUnit(getLifeUnit());
+      }
+    });
+
+    return () => {
+      listener.remove();
+    };
+  }, []);
+
+  return unit;
+}
+
+// Share Sheet Preferences
+const SHARE_THEME_KEY = "share_theme";
+const SHARE_COLOR_KEY = "share_color";
+const SHARE_SHAPE_KEY = "share_shape";
+const SHARE_SHOW_TITLE_KEY = "share_show_title";
+const SHARE_SHOW_TIME_LEFT_KEY = "share_show_time_left";
+const SHARE_SHOW_APP_KEY = "share_show_app";
+
+export function getSharePreferences() {
+  return {
+    theme: storage.getString(SHARE_THEME_KEY) || "Dark",
+    color: storage.getString(SHARE_COLOR_KEY) || "Red",
+    shape: storage.getString(SHARE_SHAPE_KEY) || "Stars",
+    showTitle: storage.getBoolean(SHARE_SHOW_TITLE_KEY) ?? true,
+    showTimeLeft: storage.getBoolean(SHARE_SHOW_TIME_LEFT_KEY) ?? true,
+    showApp: storage.getBoolean(SHARE_SHOW_APP_KEY) ?? true,
+  };
+}
+
+export function setSharePreferences(prefs: {
+  theme?: string;
+  color?: string;
+  shape?: string;
+  showTitle?: boolean;
+  showTimeLeft?: boolean;
+  showApp?: boolean;
+}) {
+  if (prefs.theme) storage.set(SHARE_THEME_KEY, prefs.theme);
+  if (prefs.color) storage.set(SHARE_COLOR_KEY, prefs.color);
+  if (prefs.shape) storage.set(SHARE_SHAPE_KEY, prefs.shape);
+  if (prefs.showTitle !== undefined) storage.set(SHARE_SHOW_TITLE_KEY, prefs.showTitle);
+  if (prefs.showTimeLeft !== undefined) storage.set(SHARE_SHOW_TIME_LEFT_KEY, prefs.showTimeLeft);
+  if (prefs.showApp !== undefined) storage.set(SHARE_SHOW_APP_KEY, prefs.showApp);
 }

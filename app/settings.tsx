@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { DatePicker, Host, ContextMenu, Button } from "@expo/ui/swift-ui";
+import { datePickerStyle } from "@expo/ui/swift-ui/modifiers";
 import { router } from "expo-router";
 import {
   getUserProfile,
@@ -26,6 +27,13 @@ import {
   type LifeUnit,
   type BackgroundMode,
   type AccentColor,
+  useAccentColor,
+  getLifeSymbol,
+  setLifeSymbol,
+  type LifeSymbol,
+  useLifeSymbol,
+  getLifespan,
+  setLifespan,
 } from "../utils/storage";
 import { useUnistyles, UnistylesRuntime } from "react-native-unistyles";
 
@@ -53,6 +61,7 @@ function SettingsRow({
   subtitle,
   textColor = "#000000",
   secondaryTextColor = "#8E8E93",
+  rightIcon,
 }: {
   icon: string;
   iconBg: string;
@@ -67,6 +76,7 @@ function SettingsRow({
   subtitle?: string;
   textColor?: string;
   secondaryTextColor?: string;
+  rightIcon?: string;
 }) {
   return (
     <Pressable
@@ -92,7 +102,7 @@ function SettingsRow({
           {value && <Text style={[styles.settingsValue, { color: secondaryTextColor }]}>{value}</Text>}
           {showPlus && <PlusBadge />}
           {showChevron && (
-            <Ionicons name="chevron-forward" size={16} color={secondaryTextColor} />
+            <Ionicons name={(rightIcon || "chevron-forward") as any} size={16} color={secondaryTextColor} />
           )}
           {value && !showChevron && !showPlus && (
             <Ionicons
@@ -122,9 +132,13 @@ export default function SettingsScreen() {
     return date;
   });
   const [hideYouSection, setHideYouSection] = useState(false);
+  const accentColorState = useAccentColor();
+  const lifeSymbolState = useLifeSymbol();
+  const [lifespan, setLifespanState] = useState<number>(75);
   const [lifeUnit, setLifeUnitState] = useState<LifeUnit>("years");
+  const [showLifespanInput, setShowLifespanInput] = useState(false);
+  const [tempLifespan, setTempLifespan] = useState("75");
   const [backgroundMode, setBackgroundModeState] = useState<BackgroundMode>("device");
-  const [accentColorState, setAccentColorState] = useState<AccentColor>("blue");
 
   // Load profile and preferences from MMKV on mount
   useEffect(() => {
@@ -143,7 +157,8 @@ export default function SettingsScreen() {
     }
     setLifeUnitState(getLifeUnit());
     setBackgroundModeState(getBackgroundMode());
-    setAccentColorState(getAccentColor());
+    setLifespanState(getLifespan());
+    setTempLifespan(String(getLifespan()));
   }, []);
 
   const handleLifeUnitChange = (unit: LifeUnit) => {
@@ -180,12 +195,19 @@ export default function SettingsScreen() {
   };
 
   const handleAccentColorChange = (color: AccentColor) => {
-    setAccentColorState(color);
     setAccentColor(color);
   };
 
   const formatAccentColor = (color: AccentColor): string => {
     return color.charAt(0).toUpperCase() + color.slice(1);
+  };
+
+  const handleLifeSymbolChange = (symbol: LifeSymbol) => {
+    setLifeSymbol(symbol);
+  };
+
+  const formatLifeSymbol = (symbol: LifeSymbol): string => {
+    return symbol.charAt(0).toUpperCase() + symbol.slice(1);
   };
 
   const handleSaveName = () => {
@@ -208,6 +230,15 @@ export default function SettingsScreen() {
       birthDate: tempDate.toISOString(),
     });
     setShowDatePicker(false);
+  };
+
+  const handleSaveLifespan = () => {
+    const years = parseInt(tempLifespan, 10);
+    if (!isNaN(years) && years > 0 && years <= 120) {
+      setLifespanState(years);
+      setLifespan(years);
+      setShowLifespanInput(false);
+    }
   };
 
   const { theme } = useUnistyles();
@@ -267,6 +298,7 @@ export default function SettingsScreen() {
             onPress={() => setShowDatePicker(true)}
             textColor={colors.text}
             secondaryTextColor={colors.secondaryText}
+            rightIcon="chevron-expand"
           />
           <View style={[styles.settingsDivider, { backgroundColor: colors.divider }]} />
           {/* Life Unit Row with Context Menu */}
@@ -317,15 +349,15 @@ export default function SettingsScreen() {
             icon="sparkles"
             iconBg="#FF3B30"
             label="What's your lifespan?"
-            value="75 years"
-            showPlus
+            value={`${lifespan} years`}
+            onPress={() => setShowLifespanInput(true)}
             textColor={colors.text}
             secondaryTextColor={colors.secondaryText}
           />
           <View style={[styles.settingsDivider, { backgroundColor: colors.divider }]} />
           <Text style={[styles.cardFooter, { color: colors.secondaryText }]}>
             The name and birthday is used for the Life view, which is based on a
-            default life expectancy of 75 years.
+            default life expectancy of {lifespan} years.
           </Text>
         </View>
 
@@ -455,16 +487,75 @@ export default function SettingsScreen() {
             )}
           </View>
           <View style={[styles.settingsDivider, { backgroundColor: colors.divider }]} />
-          <SettingsRow
-            icon="apps"
-            iconBg="#FF9500"
-            label="Symbols"
-            value="Dots"
-            showPlus
-            textColor={colors.text}
-            secondaryTextColor={colors.secondaryText}
-          />
-          <View style={[styles.settingsDivider, { backgroundColor: colors.divider }]} />
+          {/* Symbols Row with Context Menu */}
+          <View style={styles.settingsRow}>
+            <View style={[styles.settingsIcon, { backgroundColor: "#FF9500" }]}>
+              <Ionicons name="apps" size={16} color="#FFFFFF" />
+            </View>
+            <View style={styles.settingsLabelContainer}>
+              <Text style={[styles.settingsLabel, { color: colors.text }]}>Symbols</Text>
+            </View>
+            {Platform.OS === "ios" ? (
+              <Host style={{ height: 24 }}>
+                <ContextMenu activationMethod="singlePress">
+                  <ContextMenu.Items>
+                    <Button
+                      label="Hash"
+                      systemImage={lifeSymbolState === "hash" ? "checkmark" : undefined}
+                      onPress={() => handleLifeSymbolChange("hash")}
+                    />
+                    <Button
+                      label="X"
+                      systemImage={lifeSymbolState === "x" ? "checkmark" : undefined}
+                      onPress={() => handleLifeSymbolChange("x")}
+                    />
+                    <Button
+                      label="Hearts"
+                      systemImage={lifeSymbolState === "hearts" ? "checkmark" : undefined}
+                      onPress={() => handleLifeSymbolChange("hearts")}
+                    />
+                    <Button
+                      label="Hexagons"
+                      systemImage={lifeSymbolState === "hexagons" ? "checkmark" : undefined}
+                      onPress={() => handleLifeSymbolChange("hexagons")}
+                    />
+                    <Button
+                      label="Diamonds"
+                      systemImage={lifeSymbolState === "diamonds" ? "checkmark" : undefined}
+                      onPress={() => handleLifeSymbolChange("diamonds")}
+                    />
+                    <Button
+                      label="Stars"
+                      systemImage={lifeSymbolState === "stars" ? "checkmark" : undefined}
+                      onPress={() => handleLifeSymbolChange("stars")}
+                    />
+                    <Button
+                      label="Squares"
+                      systemImage={lifeSymbolState === "squares" ? "checkmark" : undefined}
+                      onPress={() => handleLifeSymbolChange("squares")}
+                    />
+                    <Button
+                      label="Dots"
+                      systemImage={lifeSymbolState === "dots" ? "checkmark" : undefined}
+                      onPress={() => handleLifeSymbolChange("dots")}
+                    />
+                  </ContextMenu.Items>
+                  <ContextMenu.Trigger>
+                    <View style={styles.settingsRight}>
+                      <Text style={[styles.settingsValue, { color: colors.secondaryText }]}>{formatLifeSymbol(lifeSymbolState)}</Text>
+                      <Ionicons name="chevron-expand" size={16} color={colors.secondaryText} style={{ marginLeft: 4 }} />
+                    </View>
+                  </ContextMenu.Trigger>
+                </ContextMenu>
+              </Host>
+            ) : (
+              <View style={styles.settingsRight}>
+                <Text style={[styles.settingsValue, { color: colors.secondaryText }]}>{formatLifeSymbol(lifeSymbolState)}</Text>
+                <Ionicons name="chevron-expand" size={16} color={colors.secondaryText} style={{ marginLeft: 4 }} />
+              </View>
+            )}
+          </View>
+          {/* <View style={[styles.settingsDivider, { backgroundColor: colors.divider }]} />
           <SettingsRow
             icon="eye-off"
             iconBg="#FF3B30"
@@ -474,17 +565,17 @@ export default function SettingsScreen() {
             onSwitchChange={setHideYouSection}
             textColor={colors.text}
             secondaryTextColor={colors.secondaryText}
-          />
-          <View style={[styles.settingsDivider, { backgroundColor: colors.divider }]} />
+          /> */}
+          {/* <View style={[styles.settingsDivider, { backgroundColor: colors.divider }]} />
           <Text style={[styles.cardFooter, { color: colors.secondaryText }]}>
             The theme and background selected will be used to display the app
             symbols. Plus members can change the dots to other symbols as
             squares, stars, hearts and more.
-          </Text>
+          </Text> */}
         </View>
-
+        {/* TODO: Enable notifications after beta testing */}
         {/* Notifications Section */}
-        <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>Notifications</Text>
+        {/* <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>Notifications</Text>
         <View style={[styles.settingsCard, { backgroundColor: colors.cardBg }]}>
           <SettingsRow
             icon="notifications"
@@ -501,10 +592,11 @@ export default function SettingsScreen() {
             intervals. This feature is still in beta and might crash or not be
             accurate.
           </Text>
-        </View>
+        </View> */}
 
+        {/* TODO: Enable Reko section after beta testing */}
         {/* About Reko Section */}
-        <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>About Reko</Text>
+        {/* <Text style={[styles.sectionTitle, { color: colors.secondaryText }]}>About Reko</Text>
         <View style={[styles.settingsCard, { backgroundColor: colors.cardBg }]}>
           <SettingsRow
             icon="gift"
@@ -560,10 +652,10 @@ export default function SettingsScreen() {
             secondaryTextColor={colors.secondaryText}
             showChevron
           />
-        </View>
+        </View> */}
 
         {/* Version Footer */}
-        <Text style={[styles.versionText, { color: colors.secondaryText }]}>v2025.10.4 · Coded in NZ · © cntxt</Text>
+        <Text style={[styles.versionText, { color: colors.secondaryText }]}>v2026.01.09 · © omc345</Text>
       </ScrollView>
 
       {/* Name Input Modal */}
@@ -604,11 +696,50 @@ export default function SettingsScreen() {
         </Pressable>
       </Modal>
 
+      {/* Lifespan Input Modal */}
+      <Modal visible={showLifespanInput} animationType="fade" transparent>
+        <Pressable
+          style={styles.overlayBackground}
+          onPress={() => setShowLifespanInput(false)}
+        >
+          <Pressable
+            style={[styles.inputModal, { backgroundColor: colors.cardBg }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={[styles.inputModalTitle, { color: colors.text }]}>Lifespan Target</Text>
+            <TextInput
+              style={[styles.inputModalInput, { backgroundColor: colors.inputBg, color: colors.text }]}
+              value={tempLifespan}
+              onChangeText={setTempLifespan}
+              placeholder="Enter years (e.g. 80)"
+              placeholderTextColor={colors.secondaryText}
+              keyboardType="number-pad"
+              autoFocus
+            />
+            <View style={styles.inputModalButtons}>
+              <Pressable
+                style={styles.inputModalButton}
+                onPress={() => setShowLifespanInput(false)}
+              >
+                <Text style={{ color: "#007AFF", fontSize: 17 }}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.inputModalButton} onPress={handleSaveLifespan}>
+                <Text
+                  style={{ color: "#007AFF", fontSize: 17, fontWeight: "600" }}
+                >
+                  Save
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Date Picker Modal */}
       <Modal
         visible={showDatePicker}
         animationType="slide"
-        presentationStyle="formSheet"
+        presentationStyle="pageSheet"
       >
         <View style={[styles.datePickerModal, { backgroundColor: colors.cardBg }]}>
           <View style={styles.datePickerHeader}>
@@ -626,6 +757,7 @@ export default function SettingsScreen() {
                   start: new Date(1900, 0, 1),
                   end: new Date()
                 }}
+                modifiers={[datePickerStyle("graphical")]}
               />
             </Host>
           )}

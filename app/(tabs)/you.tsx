@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { getUserProfile, getAccentColor, type AccentColor } from "../../utils/storage";
+import { getUserProfile, useAccentColor, type AccentColor } from "../../utils/storage";
 import { useUnistyles } from "react-native-unistyles";
 import { accentColors } from "../../constants/theme";
 import { AdaptivePillButton } from "../../components/ui";
@@ -24,7 +24,7 @@ export default function YouScreen() {
   const isDark = theme.colors.background === '#000000' || theme.colors.background === '#111111';
 
   // Local accent color logic
-  const [accentColorName] = useState<AccentColor>(() => getAccentColor());
+  const accentColorName = useAccentColor();
   const accent = accentColors[accentColorName];
   const accentColor = isDark ? accent.secondary : accent.primary;
   const [profile, setProfile] = useState<{ name: string; birthDate: Date | null }>({ name: "", birthDate: null });

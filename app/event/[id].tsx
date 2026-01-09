@@ -8,17 +8,23 @@ import {
   Pressable,
   ImageBackground,
   useColorScheme,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GlassView } from "expo-glass-effect";
 import { hasLiquidGlassSupport } from "../../utils/capabilities";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { DatePicker, Host } from "@expo/ui/swift-ui";
+import { datePickerStyle } from "@expo/ui/swift-ui/modifiers";
 import {
   getAheadEvents,
   getSinceEvents,
+  useAccentColor,
   type AheadEvent,
   type SinceEvent,
+  type AccentColor,
 } from "../../utils/storage";
+import { accentColors } from "../../constants/theme";
 
 type EventData =
   | { type: "ahead"; event: AheadEvent }
@@ -150,111 +156,34 @@ function getMainTimeUnit(countdown: CountdownValues, isAhead: boolean): string {
   return isAhead ? "Due now" : "Just started";
 }
 
-// Mini Calendar Component
-function MiniCalendar({ targetDate }: { targetDate: Date }) {
-  const year = targetDate.getFullYear();
-  const month = targetDate.getMonth();
-  const monthName = targetDate.toLocaleDateString("en-US", { month: "long" });
+// Calendar Section Component using native DatePicker
+function CalendarSection({ targetDate, isAhead }: { targetDate: Date; isAhead: boolean }) {
+  const [displayDate, setDisplayDate] = useState(targetDate);
 
-  const firstDayOfMonth = new Date(year, month, 1);
-  const lastDayOfMonth = new Date(year, month + 1, 0);
-  const daysInMonth = lastDayOfMonth.getDate();
-
-  let startDay = firstDayOfMonth.getDay();
-  startDay = startDay === 0 ? 6 : startDay - 1;
-
-  const targetDay = targetDate.getDate();
-  const today = new Date();
-  const isCurrentMonth =
-    today.getMonth() === month && today.getFullYear() === year;
-  const currentDay = isCurrentMonth ? today.getDate() : -1;
-
-  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-  const calendarDays: (number | null)[] = [];
-  for (let i = 0; i < startDay; i++) {
-    calendarDays.push(null);
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    calendarDays.push(i);
-  }
-
-  const weeks: (number | null)[][] = [];
-  for (let i = 0; i < calendarDays.length; i += 7) {
-    weeks.push(calendarDays.slice(i, i + 7));
+  if (Platform.OS !== "ios") {
+    return null; // Only show on iOS
   }
 
   return (
     <View style={styles.calendarContainer}>
-      <View style={styles.calendarHeader}>
-        <View style={styles.calendarTitleRow}>
-          <Text style={styles.calendarMonth}>{monthName}</Text>
-          <Text style={styles.calendarYear}>{year}</Text>
-        </View>
-        <View style={styles.calendarNavRow}>
-          <Pressable style={styles.calendarNavButton}>
-            <Ionicons name="chevron-back" size={16} color="#8E8E93" />
-          </Pressable>
-          <Pressable style={styles.calendarNavButton}>
-            <Ionicons name="chevron-forward" size={16} color="#8E8E93" />
-          </Pressable>
-          <Pressable style={styles.calendarNavButton}>
-            <Ionicons name="calendar-outline" size={16} color="#8E8E93" />
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.weekDaysRow}>
-        {weekDays.map((day) => (
-          <View key={day} style={styles.weekDayCell}>
-            <Text style={styles.weekDayText}>{day}</Text>
-          </View>
-        ))}
-      </View>
-
-      {weeks.map((week, weekIndex) => (
-        <View key={weekIndex} style={styles.weekRow}>
-          {week.map((day, dayIndex) => {
-            const isTarget = day === targetDay;
-            const isCurrent = day === currentDay;
-            const isHighlighted = day !== null && day <= targetDay;
-            const isPast = day !== null && day < currentDay;
-
-            return (
-              <View key={dayIndex} style={styles.dayCell}>
-                {day !== null ? (
-                  <View
-                    style={[
-                      styles.dayCircle,
-                      isHighlighted && styles.dayCircleHighlighted,
-                      isPast && styles.dayCirclePast,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.dayText,
-                        isHighlighted && styles.dayTextHighlighted,
-                      ]}
-                    >
-                      {day}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.dayCircleEmpty} />
-                )}
-              </View>
-            );
-          })}
-          {week.length < 7 &&
-            Array(7 - week.length)
-              .fill(null)
-              .map((_, i) => (
-                <View key={`empty-${i}`} style={styles.dayCell}>
-                  <View style={styles.dayCircleEmpty} />
-                </View>
-              ))}
-        </View>
-      ))}
+      <Host style={styles.calendarHost}>
+        <DatePicker
+          selection={displayDate}
+          onDateChange={setDisplayDate}
+          range={
+            isAhead
+              ? {
+                  start: new Date(),
+                  end: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000),
+                }
+              : {
+                  start: new Date(Date.now() - 50 * 365 * 24 * 60 * 60 * 1000),
+                  end: new Date(),
+                }
+          }
+          modifiers={[datePickerStyle("graphical")]}
+        />
+      </Host>
     </View>
   );
 }
@@ -297,6 +226,11 @@ export default function EventDetailScreen() {
   const isDark = colorScheme === "dark";
   const [eventData, setEventData] = useState<EventData>(null);
   const [countdown, setCountdown] = useState<CountdownValues | null>(null);
+
+  // Dynamic accent color
+  const accentColorName = useAccentColor();
+  // This screen is always dark-themed (Hero UI)
+  const accentColor = accentColors[accentColorName].primary; // using primary as it pops better on black than secondary often, or check matches
 
   // Load event data
   useEffect(() => {
@@ -370,9 +304,9 @@ export default function EventDetailScreen() {
     surface: "#1C1C1E",
     text: "#FFFFFF",
     textSecondary: "#8E8E93",
-    accent: "#FF9500",
+    accent: accentColor,
     progressDone: "#8E8E93",
-    progressLeft: "#FF9500",
+    progressLeft: accentColor,
   };
 
   return (
@@ -500,7 +434,7 @@ export default function EventDetailScreen() {
         </View>
 
         {/* Calendar Section */}
-        <MiniCalendar targetDate={targetDate} />
+        <CalendarSection targetDate={targetDate} isAhead={isAhead} />
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
@@ -666,80 +600,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
     backgroundColor: "#1C1C1E",
     borderRadius: 12,
-    padding: 16,
+    overflow: "hidden",
   },
-  calendarHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  calendarTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  calendarMonth: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  calendarYear: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#FF9500",
-  },
-  calendarNavRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  calendarNavButton: {
-    padding: 4,
-  },
-  weekDaysRow: {
-    flexDirection: "row",
-    marginBottom: 8,
-  },
-  weekDayCell: {
-    flex: 1,
-    alignItems: "center",
-  },
-  weekDayText: {
-    fontSize: 12,
-    color: "#8E8E93",
-  },
-  weekRow: {
-    flexDirection: "row",
-    marginBottom: 8,
-  },
-  dayCell: {
-    flex: 1,
-    alignItems: "center",
-  },
-  dayCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dayCircleHighlighted: {
-    backgroundColor: "#FF9500",
-  },
-  dayCirclePast: {
-    opacity: 0.5,
-  },
-  dayCircleEmpty: {
-    width: 32,
-    height: 32,
-  },
-  dayText: {
-    fontSize: 14,
-    color: "#FFFFFF",
-  },
-  dayTextHighlighted: {
-    color: "#000000",
-    fontWeight: "600",
+  calendarHost: {
+    width: "100%",
+    height: 380,
   },
 
   // Action Buttons
