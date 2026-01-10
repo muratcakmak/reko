@@ -206,9 +206,8 @@ export default function YouScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Native header with liquid glass - title and settings button */}
+      {/* Native header with liquid glass - settings button only */}
       <Stack.Header>
-        <Stack.Header.Title>You</Stack.Header.Title>
         <Stack.Header.Right>
           <Stack.Header.Button
             icon="gearshape"

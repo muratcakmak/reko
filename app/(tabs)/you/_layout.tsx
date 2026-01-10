@@ -9,20 +9,21 @@ export default function YouLayout() {
   return (
     <Stack
       screenOptions={{
-        headerTransparent: true,
+        headerTransparent: isGlassAvailable,
         headerStyle: {
-          backgroundColor: theme.colors.transparent,
+          // iOS 26+ (Liquid Glass): transparent, iOS 18: solid background
+          backgroundColor: isGlassAvailable
+            ? theme.colors.transparent
+            : theme.colors.background,
         },
         // When liquid glass is available, let the system handle blur natively
-        // Otherwise, use systemMaterial blur for older iOS
-        headerBlurEffect: isGlassAvailable ? undefined : rt.themeName === "dark"
-          ? "systemMaterialDark"
-          : "systemMaterialLight",
+        // Otherwise, no blur needed since we have solid background
+        headerBlurEffect: isGlassAvailable ? undefined : undefined,
         headerLargeTitle: false,
         headerTitleAlign: "center",
       }}
     >
-      <Stack.Screen name="index" />
+      <Stack.Screen name="index" options={{ headerTitle: "" }} />
     </Stack>
   );
 }

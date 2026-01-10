@@ -389,7 +389,7 @@ const ACCENT_COLOR_KEY = "accent_color";
 
 export function getAccentColor(): AccentColor {
   const color = storage.getString(ACCENT_COLOR_KEY);
-  return (color as AccentColor) || "blue";
+  return (color as AccentColor) || "orange";
 }
 
 export function setAccentColor(color: AccentColor): void {
