@@ -1,10 +1,8 @@
 import React from "react";
 import { StyleSheet, View, Text, Pressable, ImageBackground, StyleProp, ViewStyle } from "react-native";
-import { FlashList } from "@shopify/flash-list";
-import { Image } from "expo-image";
+
+
 import { useUnistyles } from "react-native-unistyles";
-import { hasLiquidGlassSupport } from "../utils/capabilities";
-import { GlassView } from "expo-glass-effect";
 
 interface TimeCardProps {
     title: string;
@@ -69,14 +67,6 @@ export function TimeCard({
             )}
         </View>
     );
-
-    if (onPress) {
-        return (
-            <Pressable onPress={onPress} style={({ pressed }) => [style, pressed && { opacity: 0.9 }]}>
-                {InnerComponent}
-            </Pressable>
-        );
-    }
 
     return <View style={style}>{InnerComponent}</View>;
 }

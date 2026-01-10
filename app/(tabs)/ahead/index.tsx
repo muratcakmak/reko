@@ -338,15 +338,17 @@ export default function AheadScreen() {
             style={viewMode === "grid" ? styles.gridCardWrapper : styles.listCardWrapper}
           >
             <Link href={{ pathname: "/event/[id]", params: { id: event.id } }} style={styles.cardLink}>
-              <Link.Trigger style={styles.cardTrigger}>
-                <TimeCard
-                  title={event.title}
-                  daysValue={"In " + getDaysUntil(event.dateObj)}
-                  daysLabel="days"
-                  subtitle={formatDate(event.dateObj)}
-                  image={event.image}
-                  compact={viewMode === "grid"}
-                />
+              <Link.Trigger>
+                <View style={styles.cardTrigger}>
+                  <TimeCard
+                    title={event.title}
+                    daysValue={"In " + getDaysUntil(event.dateObj)}
+                    daysLabel="days"
+                    subtitle={formatDate(event.dateObj)}
+                    image={event.image}
+                    compact={viewMode === "grid"}
+                  />
+                </View>
               </Link.Trigger>
               <Link.Menu>
                 <Link.MenuAction title="Show" icon="eye" onPress={() => handleShowEvent(event.id)} />
@@ -368,7 +370,7 @@ export default function AheadScreen() {
         onClose={() => setShowAddModal(false)}
         onAdd={handleAddEvent}
       />
-    </View>
+    </View >
   );
 }
 

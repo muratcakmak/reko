@@ -336,15 +336,17 @@ export default function SinceScreen() {
               style={viewMode === "grid" ? styles.gridCardWrapper : styles.listCardWrapper}
             >
               <Link href={{ pathname: "/event/[id]", params: { id: event.id } }} style={styles.cardLink}>
-                <Link.Trigger style={styles.cardTrigger}>
-                  <TimeCard
-                    title={event.title}
-                    daysValue={daysSince + " days"}
-                    daysLabel="since"
-                    subtitle={formatDate(event.dateObj)}
-                    image={event.image}
-                    compact={viewMode === "grid"}
-                  />
+                <Link.Trigger>
+                  <View style={styles.cardTrigger}>
+                    <TimeCard
+                      title={event.title}
+                      daysValue={getDaysSince(event.dateObj) + ""}
+                      daysLabel="days since"
+                      subtitle={formatDate(event.dateObj)}
+                      image={event.image}
+                      compact={viewMode === "grid"}
+                    />
+                  </View>
                 </Link.Trigger>
                 <Link.Menu>
                   <Link.MenuAction title="Show" icon="eye" onPress={() => handleShowEvent(event.id)} />

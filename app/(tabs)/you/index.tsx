@@ -1,13 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { StyleSheet, View, Text, Pressable, ScrollView, Platform } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SymbolView } from "expo-symbols";
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { getUserProfile, useAccentColor, getLifespan } from "../../utils/storage";
+import { getUserProfile, useAccentColor, getLifespan } from "../../../utils/storage";
 import { useUnistyles } from "react-native-unistyles";
-import { AdaptivePillButton } from "../../components/ui";
 import * as Haptics from "expo-haptics";
 import Animated, {
   useSharedValue,
@@ -16,7 +14,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { LifeInsights } from "../../components/LifeInsights";
+import { LifeInsights } from "../../../components/LifeInsights";
 
 // Precise Countdown Component
 function PreciseCountdown({
@@ -85,7 +83,6 @@ function PreciseCountdown({
 export default function YouScreen() {
   const { theme } = useUnistyles();
   const styles = createStyles(theme);
-  const insets = useSafeAreaInsets();
   const isDark = theme.isDark;
 
   // Local accent color logic
@@ -208,20 +205,24 @@ export default function YouScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerSpacer} />
-        <AdaptivePillButton onPress={openSettings} style={styles.pillButton}>
-          <Ionicons name="settings-outline" size={20} color={theme.colors.textPrimary} />
-        </AdaptivePillButton>
-      </View>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* Native header with liquid glass - title and settings button */}
+      <Stack.Header>
+        <Stack.Header.Title>You</Stack.Header.Title>
+        <Stack.Header.Right>
+          <Stack.Header.Button
+            icon="gearshape"
+            onPress={openSettings}
+          />
+        </Stack.Header.Right>
+      </Stack.Header>
 
       {/* Content */}
       <ScrollView
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        contentInsetAdjustmentBehavior="automatic"
         alwaysBounceVertical={true}
       >
         <View style={styles.profileSection}>
@@ -273,31 +274,12 @@ const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 0,
-    zIndex: 10,
-  },
-  headerSpacer: {
-    flex: 1,
-  },
-  pillButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    flexDirection: "row",
-    alignItems: "center",
-  },
   scrollContent: {
     paddingBottom: 100,
+    paddingHorizontal: 20,
   },
   profileSection: {
     alignItems: "center",
-    paddingHorizontal: 20,
     paddingTop: 20,
   },
   profileCard: {
