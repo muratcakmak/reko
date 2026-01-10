@@ -241,6 +241,7 @@ export function EventDetailScreen() {
   const { theme } = useUnistyles();
   const [eventData, setEventData] = useState<EventData>(null);
   const [countdown, setCountdown] = useState<CountdownValues | null>(null);
+  const [notFound, setNotFound] = useState(false);
 
   // Dynamic accent color
   const accentColorName = useAccentColor();
@@ -275,7 +276,10 @@ export function EventDetailScreen() {
 
   // Load event data
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      setNotFound(true);
+      return;
+    }
 
     // Check ahead events first, then since events
     const aheadEvents = getAheadEvents();
@@ -283,6 +287,7 @@ export function EventDetailScreen() {
 
     if (aheadEvent) {
       setEventData({ type: "ahead", event: aheadEvent });
+      setNotFound(false);
       return;
     }
 
@@ -291,6 +296,10 @@ export function EventDetailScreen() {
 
     if (sinceEvent) {
       setEventData({ type: "since", event: sinceEvent });
+      setNotFound(false);
+    } else {
+      // Event not found in either list
+      setNotFound(true);
     }
   }, [id]);
 
@@ -315,11 +324,35 @@ export function EventDetailScreen() {
     return () => clearInterval(interval);
   }, [eventData]);
 
+  if (notFound) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
+          <Pressable
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace("/ahead");
+              }
+            }}
+            style={styles.notFoundBackButton}
+          >
+            <Ionicons name="chevron-back" size={24} color={theme.colors.textPrimary} />
+          </Pressable>
+          <Ionicons name="calendar-outline" size={64} color={theme.colors.textSecondary} style={{ marginBottom: 16 }} />
+          <Text style={[styles.loadingText, { color: theme.colors.textPrimary, fontSize: 18, fontWeight: "600" }]}>Event not found</Text>
+          <Text style={[styles.loadingText, { color: theme.colors.textSecondary, marginTop: 8 }]}>This event may have been deleted</Text>
+        </View>
+      </View>
+    );
+  }
+
   if (!eventData || !countdown) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading...</Text>
         </View>
       </View>
     );
@@ -512,6 +545,16 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: "#8E8E93",
+  },
+  notFoundBackButton: {
+    position: "absolute",
+    top: 60,
+    left: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // Close Button

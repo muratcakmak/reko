@@ -12,12 +12,43 @@ struct RekoEventData: Codable, Identifiable, Hashable {
     let image: String?
 
     var targetDate: Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         // Try startDate first (SinceEvent), then date (AheadEvent)
-        if let dateStr = startDate ?? date, !dateStr.isEmpty {
-            return formatter.date(from: dateStr) ?? ISO8601DateFormatter().date(from: dateStr)
+        guard let dateStr = startDate ?? date, !dateStr.isEmpty else {
+            return nil
         }
+
+        // Try multiple ISO8601 format options for robust parsing
+        let formatOptions: [ISO8601DateFormatter.Options] = [
+            [.withInternetDateTime, .withFractionalSeconds],
+            [.withInternetDateTime],
+            [.withFullDate, .withFullTime, .withTimeZone],
+            [.withFullDate]
+        ]
+
+        for options in formatOptions {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = options
+            if let date = formatter.date(from: dateStr) {
+                return date
+            }
+        }
+
+        // Fallback: try DateFormatter with common formats
+        let fallbackFormatter = DateFormatter()
+        fallbackFormatter.locale = Locale(identifier: "en_US_POSIX")
+        let formats = [
+            "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+            "yyyy-MM-dd'T'HH:mm:ssZ",
+            "yyyy-MM-dd'T'HH:mm:ss",
+            "yyyy-MM-dd"
+        ]
+        for format in formats {
+            fallbackFormatter.dateFormat = format
+            if let date = fallbackFormatter.date(from: dateStr) {
+                return date
+            }
+        }
+
         return nil
     }
 }
@@ -39,6 +70,37 @@ struct RekoStorage {
               let jsonString = userDefaults.string(forKey: "since_events"),
               let data = jsonString.data(using: .utf8) else { return [] }
         return (try? JSONDecoder().decode([RekoEventData].self, from: data)) ?? []
+    }
+
+    /// Load image from the App Group shared container
+    static func loadImage(for event: RekoEventData) -> UIImage? {
+        guard let imagePath = event.image, !imagePath.isEmpty else { return nil }
+
+        // Get the App Group container URL
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) else {
+            return nil
+        }
+
+        // The image path could be:
+        // 1. Just a filename (relative) - look in /images/ folder
+        // 2. A full file:// URL - extract filename and look in /images/ folder
+        let filename: String
+        if imagePath.contains("/") {
+            // Extract just the filename from the path
+            filename = (imagePath as NSString).lastPathComponent
+        } else {
+            filename = imagePath
+        }
+
+        let imageURL = containerURL.appendingPathComponent("images").appendingPathComponent(filename)
+
+        guard FileManager.default.fileExists(atPath: imageURL.path),
+              let imageData = try? Data(contentsOf: imageURL),
+              let image = UIImage(data: imageData) else {
+            return nil
+        }
+
+        return image
     }
 }
 
@@ -137,9 +199,10 @@ struct RekoEventEntry: TimelineEntry {
     let event: RekoEventData?
     let daysCount: Int
     let isCountdown: Bool
+    let backgroundImage: UIImage?
 
     static func placeholder(isCountdown: Bool) -> RekoEventEntry {
-        RekoEventEntry(date: Date(), event: RekoEventData(id: "placeholder", title: "Event", date: "", startDate: nil, image: nil), daysCount: 42, isCountdown: isCountdown)
+        RekoEventEntry(date: Date(), event: RekoEventData(id: "placeholder", title: "Event", date: "", startDate: nil, image: nil), daysCount: 42, isCountdown: isCountdown, backgroundImage: nil)
     }
 }
 
@@ -167,12 +230,18 @@ struct AheadEventProvider: AppIntentTimelineProvider {
         let events = RekoStorage.loadAheadEvents()
         let event: RekoEventData? = config.event.flatMap { entity in events.first { $0.id == entity.id } } ?? events.first
 
-        guard let event = event, let targetDate = event.targetDate else {
-            return RekoEventEntry(date: date, event: nil, daysCount: 0, isCountdown: true)
+        guard let event = event else {
+            return RekoEventEntry(date: date, event: nil, daysCount: 0, isCountdown: true, backgroundImage: nil)
         }
 
-        let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: date), to: Calendar.current.startOfDay(for: targetDate)).day ?? 0
-        return RekoEventEntry(date: date, event: event, daysCount: max(0, days), isCountdown: true)
+        // Calculate days - use 0 if date parsing fails
+        var days = 0
+        if let targetDate = event.targetDate {
+            days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: date), to: Calendar.current.startOfDay(for: targetDate)).day ?? 0
+        }
+
+        let backgroundImage = RekoStorage.loadImage(for: event)
+        return RekoEventEntry(date: date, event: event, daysCount: max(0, days), isCountdown: true, backgroundImage: backgroundImage)
     }
 }
 
@@ -200,12 +269,18 @@ struct SinceEventProvider: AppIntentTimelineProvider {
         let events = RekoStorage.loadSinceEvents()
         let event: RekoEventData? = config.event.flatMap { entity in events.first { $0.id == entity.id } } ?? events.first
 
-        guard let event = event, let targetDate = event.targetDate else {
-            return RekoEventEntry(date: date, event: nil, daysCount: 0, isCountdown: false)
+        guard let event = event else {
+            return RekoEventEntry(date: date, event: nil, daysCount: 0, isCountdown: false, backgroundImage: nil)
         }
 
-        let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: targetDate), to: Calendar.current.startOfDay(for: date)).day ?? 0
-        return RekoEventEntry(date: date, event: event, daysCount: max(0, days), isCountdown: false)
+        // Calculate days - use 0 if date parsing fails
+        var days = 0
+        if let targetDate = event.targetDate {
+            days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: targetDate), to: Calendar.current.startOfDay(for: date)).day ?? 0
+        }
+
+        let backgroundImage = RekoStorage.loadImage(for: event)
+        return RekoEventEntry(date: date, event: event, daysCount: max(0, days), isCountdown: false, backgroundImage: backgroundImage)
     }
 }
 
@@ -219,6 +294,10 @@ struct WidgetSmallView: View {
         entry.isCountdown ? .orange : .blue
     }
 
+    var hasImage: Bool {
+        entry.backgroundImage != nil
+    }
+
     var body: some View {
         VStack(spacing: 4) {
             if let event = entry.event {
@@ -227,15 +306,18 @@ struct WidgetSmallView: View {
                     .fontWeight(.medium)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                    .foregroundStyle(hasImage ? .white : (colorScheme == .dark ? .white : .primary))
+                    .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
 
                 Text("\(entry.daysCount)")
                     .font(.system(size: 44, weight: .bold, design: .rounded))
-                    .foregroundStyle(accentColor)
+                    .foregroundStyle(hasImage ? .white : accentColor)
+                    .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
 
                 Text(entry.isCountdown ? "days left" : "days ago")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(hasImage ? .white.opacity(0.8) : .secondary)
+                    .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
             } else {
                 Image(systemName: "calendar.badge.plus")
                     .font(.largeTitle)
@@ -246,7 +328,18 @@ struct WidgetSmallView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .containerBackground(colorScheme == .dark ? Color.black.opacity(0.8) : Color.white.opacity(0.9), for: .widget)
+        .containerBackground(for: .widget) {
+            if let bgImage = entry.backgroundImage {
+                ZStack {
+                    Image(uiImage: bgImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                    Color.black.opacity(0.4)
+                }
+            } else {
+                colorScheme == .dark ? Color.black : Color.white
+            }
+        }
     }
 }
 
@@ -258,26 +351,33 @@ struct WidgetMediumView: View {
         entry.isCountdown ? .orange : .blue
     }
 
+    var hasImage: Bool {
+        entry.backgroundImage != nil
+    }
+
     var body: some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.isCountdown ? "COUNTDOWN" : "SINCE")
                     .font(.caption2)
                     .fontWeight(.bold)
-                    .foregroundStyle(accentColor)
+                    .foregroundStyle(hasImage ? .white.opacity(0.8) : accentColor)
+                    .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
 
                 if let event = entry.event {
                     Text(event.title)
                         .font(.headline)
-                        .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                        .foregroundStyle(hasImage ? .white : (colorScheme == .dark ? .white : .primary))
                         .lineLimit(2)
+                        .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
 
                     Spacer()
 
                     if let targetDate = event.targetDate {
                         Text(targetDate, style: .date)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(hasImage ? .white.opacity(0.8) : .secondary)
+                            .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
                     }
                 } else {
                     Text("No event")
@@ -292,16 +392,29 @@ struct WidgetMediumView: View {
             VStack {
                 Text("\(entry.daysCount)")
                     .font(.system(size: 48, weight: .bold, design: .rounded))
-                    .foregroundStyle(accentColor)
+                    .foregroundStyle(hasImage ? .white : accentColor)
+                    .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
 
                 Text("days")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(hasImage ? .white.opacity(0.8) : .secondary)
+                    .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
             }
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .containerBackground(colorScheme == .dark ? Color.black.opacity(0.8) : Color.white.opacity(0.9), for: .widget)
+        .containerBackground(for: .widget) {
+            if let bgImage = entry.backgroundImage {
+                ZStack {
+                    Image(uiImage: bgImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                    Color.black.opacity(0.4)
+                }
+            } else {
+                colorScheme == .dark ? Color.black : Color.white
+            }
+        }
     }
 }
 
@@ -311,6 +424,10 @@ struct WidgetLargeView: View {
 
     var accentColor: Color {
         entry.isCountdown ? .orange : .blue
+    }
+
+    var hasImage: Bool {
+        entry.backgroundImage != nil
     }
 
     var progressValue: CGFloat {
@@ -325,20 +442,23 @@ struct WidgetLargeView: View {
                 Text(entry.isCountdown ? "COUNTDOWN" : "SINCE")
                     .font(.caption)
                     .fontWeight(.bold)
-                    .foregroundStyle(accentColor)
+                    .foregroundStyle(hasImage ? .white.opacity(0.8) : accentColor)
+                    .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
 
                 Spacer()
 
                 Image(systemName: entry.isCountdown ? "hourglass" : "clock.arrow.circlepath")
-                    .foregroundStyle(accentColor)
+                    .foregroundStyle(hasImage ? .white.opacity(0.8) : accentColor)
+                    .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
             }
 
             if let event = entry.event {
                 Text(event.title)
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                    .foregroundStyle(hasImage ? .white : (colorScheme == .dark ? .white : .primary))
                     .lineLimit(2)
+                    .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
 
                 Spacer()
 
@@ -346,11 +466,13 @@ struct WidgetLargeView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(entry.daysCount)")
                             .font(.system(size: 64, weight: .bold, design: .rounded))
-                            .foregroundStyle(accentColor)
+                            .foregroundStyle(hasImage ? .white : accentColor)
+                            .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
 
                         Text(entry.isCountdown ? "days remaining" : "days elapsed")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(hasImage ? .white.opacity(0.8) : .secondary)
+                            .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
                     }
 
                     Spacer()
@@ -359,11 +481,13 @@ struct WidgetLargeView: View {
                         VStack(alignment: .trailing, spacing: 2) {
                             Text(entry.isCountdown ? "Target" : "Started")
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(hasImage ? .white.opacity(0.7) : .secondary)
+                                .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
                             Text(targetDate, style: .date)
                                 .font(.caption)
                                 .fontWeight(.medium)
-                                .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                                .foregroundStyle(hasImage ? .white : (colorScheme == .dark ? .white : .primary))
+                                .shadow(color: hasImage ? .black.opacity(0.5) : .clear, radius: 2, x: 0, y: 1)
                         }
                     }
                 }
@@ -371,11 +495,11 @@ struct WidgetLargeView: View {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
+                            .fill(hasImage ? Color.white.opacity(0.3) : (colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1)))
                             .frame(height: 8)
 
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(accentColor)
+                            .fill(hasImage ? Color.white : accentColor)
                             .frame(width: max(8, geometry.size.width * progressValue), height: 8)
                     }
                 }
@@ -396,7 +520,18 @@ struct WidgetLargeView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .containerBackground(colorScheme == .dark ? Color.black.opacity(0.8) : Color.white.opacity(0.9), for: .widget)
+        .containerBackground(for: .widget) {
+            if let bgImage = entry.backgroundImage {
+                ZStack {
+                    Image(uiImage: bgImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                    Color.black.opacity(0.4)
+                }
+            } else {
+                colorScheme == .dark ? Color.black : Color.white
+            }
+        }
     }
 }
 

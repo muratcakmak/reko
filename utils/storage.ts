@@ -30,7 +30,18 @@ export function refreshWidgets(): void {
 }
 
 // Image storage directory
-const getImageDir = () => new Directory(Paths.document, "images");
+const getImageDir = () => {
+  if (Platform.OS === "ios") {
+    const groupPath = WidgetSync.getGroupContainerPath();
+    if (groupPath) {
+      // Use the shared App Group container
+      // Note: We append "images" to keep it organized
+      return new Directory(groupPath, "images");
+    }
+  }
+  // Fallback to private documents directory
+  return new Directory(Paths.document, "images");
+};
 
 // Ensure image directory exists
 async function ensureImageDir() {
@@ -48,13 +59,13 @@ function makeImageRelative(uri: string | undefined): string | undefined {
   // If it's already just a filename (no slashes), return it
   if (!uri.includes("/")) return uri;
 
-  // If it's an absolute path to our own image directory, extract filename
-  if (uri.includes("/Documents/images/")) {
+  // Extract filename from any path containing /images/
+  // Works for both Documents and App Group container paths
+  if (uri.includes("/images/")) {
     return uri.split("/images/").pop();
   }
 
-  // Fallback: if it's some other path, return strictly the filename to be safe
-  // This assumes we only store images in our controlled directory
+  // Fallback: extract just the filename from any path
   return uri.split("/").pop();
 }
 
@@ -70,20 +81,30 @@ function resolveImageUri(path: string | undefined): string | undefined {
     if (path.startsWith("file://")) {
       const filename = path.split("/").pop();
       if (filename) {
-        const currentFile = new File(getImageDir(), filename);
-        if (currentFile.exists) {
-          return currentFile.uri;
-        }
+        // 1. Check current Shared Container
+        const sharedFile = new File(getImageDir(), filename);
+        if (sharedFile.exists) return sharedFile.uri;
+
+        // 2. Fallback: Check Legacy Documents Directory (pre-WidgetSync)
+        const legacyFile = new File(Paths.document + "/images/" + filename);
+        if (legacyFile.exists) return legacyFile.uri;
       }
-      // If we can't rescue it, return original path (might work if it's temp or persistent in a different way)
       return path;
     }
     return path;
   }
 
-  // If it's just a filename, prepend current directory
-  const currentFile = new File(getImageDir(), path);
-  return currentFile.uri;
+  // If it's just a filename
+  // 1. Check Shared Container
+  const sharedFile = new File(getImageDir(), path);
+  if (sharedFile.exists) return sharedFile.uri;
+
+  // 2. Fallback: Check Legacy Documents Directory
+  const legacyFile = new File(Paths.document + "/images/" + path);
+  if (legacyFile.exists) return legacyFile.uri;
+
+  // Default to shared path if neither exists (will likely fail to load but is correct "current" path)
+  return sharedFile.uri;
 }
 
 // Save image locally and return local URI
@@ -262,23 +283,17 @@ export function syncAllEventsToWidget(): void {
   if (Platform.OS !== "ios") return;
 
   try {
-    // Sync ahead events
-    // NOTE: Widgets might need absolute paths? 
-    // But widgets have their own limited file access. Passing image paths might be tricky.
-    // Usually widgets use App Group container. 
-    // For now, we save relative, but maybe widgets expect full? 
-    // Or we just save what we have. getAheadEvents returns Absolute, so we save Absolute to widget.
-    // If widget needs to load it, it must be in a shared group. 
-    // This is a separate concern but standard syncing sends JSON.
-    const aheadEvents = getAheadEvents();
-    if (aheadEvents.length > 0) {
-      syncToWidgetStorage(AHEAD_EVENTS_KEY, JSON.stringify(aheadEvents));
+    // Sync ahead events - use raw MMKV data which has RELATIVE paths
+    // Widget will resolve these relative paths using the App Group container
+    const aheadEventsRaw = storage.getString(AHEAD_EVENTS_KEY);
+    if (aheadEventsRaw) {
+      syncToWidgetStorage(AHEAD_EVENTS_KEY, aheadEventsRaw);
     }
 
-    // Sync since events
-    const sinceEvents = getSinceEvents();
-    if (sinceEvents.length > 0) {
-      syncToWidgetStorage(SINCE_EVENTS_KEY, JSON.stringify(sinceEvents));
+    // Sync since events - use raw MMKV data which has RELATIVE paths
+    const sinceEventsRaw = storage.getString(SINCE_EVENTS_KEY);
+    if (sinceEventsRaw) {
+      syncToWidgetStorage(SINCE_EVENTS_KEY, sinceEventsRaw);
     }
 
     // Sync background mode for native theme initialization
@@ -287,10 +302,7 @@ export function syncAllEventsToWidget(): void {
 
     // Refresh widgets
     refreshWidgets();
-    console.log("[WidgetSync] Synced events to widget storage:", {
-      ahead: aheadEvents.length,
-      since: sinceEvents.length,
-    });
+    console.log("[WidgetSync] Synced events to widget storage");
   } catch (error) {
     console.log("[WidgetSync] Failed to sync:", error);
   }

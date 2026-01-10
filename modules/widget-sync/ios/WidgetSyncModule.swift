@@ -46,5 +46,10 @@ public class WidgetSyncModule: Module {
                 WidgetCenter.shared.reloadTimelines(ofKind: kind)
             }
         }
+
+        // Get App Group Shared Container Path
+        Function("getGroupContainerPath") { (appGroupId: String) -> String? in
+            return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId)?.path
+        }
     }
 }
