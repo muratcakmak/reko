@@ -4,14 +4,14 @@ import { useUnistyles } from "react-native-unistyles";
 
 export default function AheadLayout() {
   const isGlassAvailable = hasLiquidGlassSupport();
-  const { rt } = useUnistyles();
+  const { rt, theme } = useUnistyles();
 
   return (
     <Stack
       screenOptions={{
         headerTransparent: true,
         headerStyle: {
-          backgroundColor: "transparent",
+          backgroundColor: theme.colors.transparent,
         },
         // When liquid glass is available, let the system handle blur natively
         // Otherwise, use systemMaterial blur for older iOS
@@ -23,15 +23,6 @@ export default function AheadLayout() {
       }}
     >
       <Stack.Screen name="index" />
-      <Stack.Screen
-        name="event/[id]"
-        options={{
-          headerShown: false,
-          presentation: "card",
-          contentStyle: { backgroundColor: "#000000" },
-          tabBarStyle: { display: "none" },
-        }}
-      />
     </Stack>
   );
 }

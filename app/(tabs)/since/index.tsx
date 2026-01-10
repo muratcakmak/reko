@@ -3,11 +3,11 @@ import { StyleSheet, View, Text, ScrollView, Pressable, ImageBackground, Modal, 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { DatePicker, Host } from "@expo/ui/swift-ui";
-import { datePickerStyle } from "@expo/ui/swift-ui/modifiers";
+import { datePickerStyle, tint } from "@expo/ui/swift-ui/modifiers";
 import * as ImagePicker from "expo-image-picker";
 import { Link, router, Stack } from "expo-router";
 import Animated, { FadeIn, FadeOut, Layout, Easing } from "react-native-reanimated";
-import { getSinceEvents, addSinceEvent, deleteSinceEvent, getSinceViewMode, setSinceViewMode, saveImageLocally, type SinceEvent, type ViewMode } from "../../../utils/storage";
+import { getSinceEvents, addSinceEvent, deleteSinceEvent, getSinceViewMode, setSinceViewMode, saveImageLocally, useAccentColor, type SinceEvent, type ViewMode } from "../../../utils/storage";
 import { useUnistyles } from "react-native-unistyles";
 // Shared Components
 import { TimeScreenLayout } from "../../../components/TimeScreenLayout";
@@ -50,6 +50,8 @@ function AddEventModal({
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const { theme } = useUnistyles();
   const styles = createStyles(theme);
+  const accentColorName = useAccentColor();
+  const accentColor = theme.colors.accent[accentColorName].primary;
 
   const handleAdd = () => {
     if (title.trim()) {
@@ -96,11 +98,11 @@ function AddEventModal({
         {/* Header */}
         <View style={styles.modalHeader}>
           <HeaderButton onPress={onClose}>
-            <Text style={[styles.modalHeaderButton, { color: "#007AFF" }]}>Cancel</Text>
+            <Text style={[styles.modalHeaderButton, { color: theme.colors.systemBlue }]}>Cancel</Text>
           </HeaderButton>
           <Text style={[styles.modalTitle, { color: textColor }]}>New Habit</Text>
           <HeaderButton onPress={handleAdd} disabled={!title.trim()}>
-            <Text style={[styles.modalHeaderButton, { color: title.trim() ? "#007AFF" : secondaryTextColor }]}>
+            <Text style={[styles.modalHeaderButton, { color: title.trim() ? theme.colors.systemBlue : secondaryTextColor }]}>
               Add
             </Text>
           </HeaderButton>
@@ -150,7 +152,7 @@ function AddEventModal({
                       start: new Date(Date.now() - 50 * 365 * 24 * 60 * 60 * 1000), // 50 years ago
                       end: new Date()
                     }}
-                    modifiers={[datePickerStyle("graphical")]}
+                    modifiers={[datePickerStyle("graphical"), tint(accentColor)]}
                   />
                 </Host>
               </View>
@@ -169,6 +171,7 @@ function AddEventModal({
 export default function SinceScreen() {
   const { theme } = useUnistyles();
   const styles = createStyles(theme);
+  const inputBg = theme.colors.surface;
   const insets = useSafeAreaInsets();
   const [events, setEvents] = useState<SinceEvent[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);

@@ -14,7 +14,7 @@ import { GlassView } from "expo-glass-effect";
 import { hasLiquidGlassSupport } from "../utils/capabilities";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { DatePicker, Host } from "@expo/ui/swift-ui";
-import { datePickerStyle } from "@expo/ui/swift-ui/modifiers";
+import { datePickerStyle, tint } from "@expo/ui/swift-ui/modifiers";
 import {
   getAheadEvents,
   getSinceEvents,
@@ -22,7 +22,6 @@ import {
   type AheadEvent,
   type SinceEvent,
 } from "../utils/storage";
-import { accentColors } from "../constants/theme";
 import { AdaptivePillButton } from "./ui";
 import { useUnistyles } from "react-native-unistyles";
 
@@ -157,7 +156,17 @@ function getMainTimeUnit(countdown: CountdownValues, isAhead: boolean): string {
 }
 
 // Calendar Section Component using native DatePicker
-const CalendarSection = React.memo(function CalendarSection({ targetDate, isAhead }: { targetDate: Date; isAhead: boolean }) {
+const CalendarSection = React.memo(function CalendarSection({
+  targetDate,
+  isAhead,
+  styles,
+  accentColor,
+}: {
+  targetDate: Date;
+  isAhead: boolean;
+  styles: ReturnType<typeof createStyles>;
+  accentColor: string;
+}) {
   const { theme } = useUnistyles();
 
   // Memoize the date range to prevent creating new Date objects on every render
@@ -179,12 +188,8 @@ const CalendarSection = React.memo(function CalendarSection({ targetDate, isAhea
     backgroundColor: theme.colors.background,
     borderColor: theme.colors.cardBorder,
     borderWidth: StyleSheet.hairlineWidth,
-    shadowColor: theme.colors.textPrimary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
-  }), [theme.colors.background, theme.colors.cardBorder, theme.colors.textPrimary]);
+    ...theme.effects.shadow.cardGlow,
+  }), [theme.colors.background, theme.colors.cardBorder, theme.effects.shadow.cardGlow]);
 
   if (Platform.OS !== "ios") {
     return null;
@@ -196,7 +201,7 @@ const CalendarSection = React.memo(function CalendarSection({ targetDate, isAhea
         <DatePicker
           selection={targetDate}
           range={dateRange}
-          modifiers={[datePickerStyle("graphical")]}
+          modifiers={[datePickerStyle("graphical"), tint(accentColor)]}
         />
       </Host>
     </View>
@@ -214,6 +219,8 @@ function HeaderPillButton({
   style?: any;
 }) {
   const isGlassAvailable = hasLiquidGlassSupport();
+  const { theme } = useUnistyles();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
 
   if (isGlassAvailable) {
     return (
@@ -239,6 +246,7 @@ export function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { theme } = useUnistyles();
+  const styles = createStyles(theme);
   const [eventData, setEventData] = useState<EventData>(null);
   const [countdown, setCountdown] = useState<CountdownValues | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -246,32 +254,18 @@ export function EventDetailScreen() {
   // Dynamic accent color
   const accentColorName = useAccentColor();
   // This screen is always dark-themed (Hero UI)
-  const accentColor = accentColors[accentColorName].primary;
+  const accentColor = theme.colors.accent[accentColorName].primary;
 
-  const isDark = theme.colors.background === '#000000' || theme.colors.background === '#111111';
-
-  const colors = {
-    background: theme.colors.background,
-    surface: theme.colors.card, // Fallback, but we might override
-    text: theme.colors.textPrimary,
-    textSecondary: theme.colors.textSecondary,
-    accent: accentColor,
-    progressDone: isDark ? "#3A3A3C" : "#E5E5EA",
-    progressLeft: accentColor,
-    cardBg: theme.colors.background, // Match app background (Black/White)
-    cardBorder: theme.colors.cardBorder,
-  };
+  const isDark = theme.isDark;
+  const progressDone = isDark ? theme.colors.systemGray4 : theme.colors.systemGray5;
+  const progressLeft = accentColor;
 
   const cardStyle = {
-    backgroundColor: colors.cardBg,
-    borderColor: colors.cardBorder,
+    backgroundColor: theme.colors.background,
+    borderColor: theme.colors.cardBorder,
     borderWidth: StyleSheet.hairlineWidth,
     // Premium shadow
-    shadowColor: theme.colors.textPrimary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
+    ...theme.effects.shadow.cardGlow,
   };
 
   // Load event data
@@ -370,7 +364,7 @@ export function EventDetailScreen() {
     "https://images.unsplash.com/photo-1448375240586-882707db888b?w=800";
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -394,9 +388,9 @@ export function EventDetailScreen() {
                   }
                 }}
                 style={styles.closeButton}
-                fallbackBackgroundColor="rgba(0, 0, 0, 0.4)"
+                fallbackBackgroundColor={theme.colors.overlay.medium}
               >
-                <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+                <Ionicons name="chevron-back" size={24} color={theme.colors.onImage.primary} />
               </AdaptivePillButton>
             </View>
             <View style={styles.heroContent}>
@@ -455,7 +449,7 @@ export function EventDetailScreen() {
                   styles.progressDone,
                   {
                     width: `${countdown.percentDone}%`,
-                    backgroundColor: colors.progressDone,
+                    backgroundColor: progressDone,
                   },
                 ]}
               />
@@ -464,7 +458,7 @@ export function EventDetailScreen() {
                   styles.progressLeft,
                   {
                     width: `${countdown.percentLeft}%`,
-                    backgroundColor: colors.progressLeft,
+                    backgroundColor: progressLeft,
                   },
                 ]}
               />
@@ -475,24 +469,24 @@ export function EventDetailScreen() {
         {/* Date Details Section */}
         <View style={[styles.section, cardStyle]}>
           <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>
+            <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
               {isAhead ? "From" : "Started"}
             </Text>
-            <Text style={[styles.detailValue, { color: colors.text }]}>
+            <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]}>
               {isAhead ? formatDate(new Date()) : formatDate(targetDate)}
             </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{isAhead ? "Until" : "Now"}</Text>
-            <Text style={[styles.detailValue, { color: colors.text }]}>
+            <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>{isAhead ? "Until" : "Now"}</Text>
+            <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]}>
               {isAhead ? formatDate(targetDate) : formatDate(new Date())}
             </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>
+            <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
               {isAhead ? "Time between" : "Duration"}
             </Text>
-            <Text style={[styles.detailValue, { color: colors.text }]}>
+            <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]}>
               {formatTimeBetween(
                 isAhead ? new Date() : targetDate,
                 isAhead ? targetDate : new Date()
@@ -500,25 +494,26 @@ export function EventDetailScreen() {
             </Text>
           </View>
           <View style={[styles.detailRow, styles.detailRowLast]}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>
+            <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>
               {isAhead ? "Time left" : "Time elapsed"}
             </Text>
-            <Text style={[styles.detailValue, { color: colors.text }]}>
+            <Text style={[styles.detailValue, { color: theme.colors.textPrimary }]}>
               {countdown.totalDays} day{countdown.totalDays !== 1 ? "s" : ""}
             </Text>
           </View>
         </View>
 
         {/* Calendar Section */}
-        <CalendarSection targetDate={targetDate} isAhead={isAhead} />
+        {/* Calendar Section */}
+        <CalendarSection targetDate={targetDate} isAhead={isAhead} styles={styles} accentColor={accentColor} />
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
           {/* <HeaderPillButton style={styles.actionButton}>
-            <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
+            <Ionicons name="ellipsis-horizontal" size={20} color={theme.colors.onImage.primary} />
           </HeaderPillButton>
           <HeaderPillButton style={styles.actionButton}>
-            <Ionicons name="share-outline" size={20} color="#FFFFFF" />
+            <Ionicons name="share-outline" size={20} color={theme.colors.onImage.primary} />
           </HeaderPillButton> */}
         </View>
       </ScrollView>
@@ -526,10 +521,9 @@ export function EventDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
   },
   scrollView: {
     flex: 1,
@@ -544,7 +538,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: "#8E8E93",
   },
   notFoundBackButton: {
     position: "absolute",
@@ -570,7 +563,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    backgroundColor: theme.colors.overlay.medium,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -584,7 +577,7 @@ const styles = StyleSheet.create({
   },
   heroOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    backgroundColor: theme.colors.overlay.medium,
     justifyContent: "flex-end",
   },
   heroContent: {
@@ -594,26 +587,26 @@ const styles = StyleSheet.create({
   mainCountdown: {
     fontSize: 36,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: theme.colors.onImage.primary,
     marginBottom: 8,
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowColor: theme.colors.shadow.medium,
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
   eventTitle: {
     fontSize: 22,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: theme.colors.onImage.primary,
     marginBottom: 4,
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowColor: theme.colors.shadow.medium,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
   eventSubtitle: {
     fontSize: 14,
-    color: "rgba(255, 255, 255, 0.8)",
+    color: theme.colors.onImage.muted,
     marginBottom: 20,
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowColor: theme.colors.shadow.medium,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
@@ -630,16 +623,16 @@ const styles = StyleSheet.create({
   countdownValue: {
     fontSize: 24,
     fontWeight: "600",
-    color: "#FFFFFF",
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    color: theme.colors.onImage.primary,
+    textShadowColor: theme.colors.shadow.medium,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
   countdownLabel: {
     fontSize: 12,
-    color: "rgba(255, 255, 255, 0.7)",
+    color: theme.colors.onImage.subtle,
     marginTop: 2,
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowColor: theme.colors.shadow.medium,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
@@ -660,11 +653,11 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 14,
-    color: "#8E8E93",
+    color: theme.colors.systemGray,
   },
   progressBar: {
     height: 8,
-    backgroundColor: "#3A3A3C",
+    backgroundColor: theme.colors.systemGray4,
     borderRadius: 4,
     flexDirection: "row",
     overflow: "hidden",
@@ -684,25 +677,22 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#3A3A3C",
+    borderBottomColor: theme.colors.systemGray4,
   },
   detailRowLast: {
     borderBottomWidth: 0,
   },
   detailLabel: {
     fontSize: 15,
-    color: "#8E8E93",
   },
   detailValue: {
     fontSize: 15,
-    color: "#FFFFFF",
   },
 
   // Calendar styles
   calendarContainer: {
     marginHorizontal: 16,
     marginTop: 16,
-    // backgroundColor: "#1C1C1E", // Removed hardcoded
     borderRadius: 12,
     overflow: "hidden",
   },
@@ -727,7 +717,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   pillButtonFallback: {
-    backgroundColor: "#2C2C2E",
+    backgroundColor: theme.colors.systemGray5,
   },
   actionButton: {
     width: 50,

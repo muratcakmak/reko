@@ -8,6 +8,7 @@ import {
 } from "react-native-reanimated";
 import { useEffect } from "react";
 import { StyleSheet, View, Text, useWindowDimensions } from "react-native";
+import { useUnistyles } from "react-native-unistyles";
 
 interface FlowCardProps {
   title: string;
@@ -113,13 +114,15 @@ export function FlowCard({
   title,
   elapsed,
   daysCount,
-  color = "#10B981",
+  color,
   width: customWidth,
   height: customHeight,
 }: FlowCardProps) {
   const dimensions = useWindowDimensions();
   const width = customWidth ?? dimensions.width - 40;
   const height = customHeight ?? 200;
+  const { theme } = useUnistyles();
+  const styles = createStyles(theme);
 
   const time = useSharedValue(0);
 
@@ -135,7 +138,8 @@ export function FlowCard({
     return [0.06, 0.73, 0.51]; // Default green
   };
 
-  const [r, g, b] = parseColor(color);
+  const liquidColor = color ?? theme.colors.liquid.green;
+  const [r, g, b] = parseColor(liquidColor);
 
   useEffect(() => {
     time.value = withRepeat(
@@ -158,7 +162,7 @@ export function FlowCard({
   return (
     <View style={[styles.container, { width, height }]}>
       <Canvas style={StyleSheet.absoluteFill}>
-        <RoundedRect x={0} y={0} width={width} height={height} r={24} color="#111111" />
+        <RoundedRect x={0} y={0} width={width} height={height} r={24} color={theme.colors.surfaceDark} />
         <Fill>
           <Shader source={FLOW_SHADER} uniforms={uniforms} />
         </Fill>
@@ -173,11 +177,11 @@ export function FlowCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     borderRadius: 24,
     overflow: "hidden",
-    backgroundColor: "#111111",
+    backgroundColor: theme.colors.surfaceDark,
   },
   content: {
     ...StyleSheet.absoluteFillObject,
@@ -188,34 +192,34 @@ const styles = StyleSheet.create({
   daysCount: {
     fontSize: 64,
     fontWeight: "100",
-    color: "#FFFFFF",
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    color: theme.colors.onImage.primary,
+    textShadowColor: theme.colors.shadow.medium,
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
   daysLabel: {
     fontSize: 18,
     fontWeight: "300",
-    color: "#FFFFFF80",
+    color: theme.colors.onImage.ghost,
     marginTop: -8,
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowColor: theme.colors.shadow.medium,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
   title: {
     fontSize: 22,
     fontWeight: "300",
-    color: "#FFFFFF",
+    color: theme.colors.onImage.primary,
     marginTop: 16,
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowColor: theme.colors.shadow.medium,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
   elapsed: {
     fontSize: 14,
-    color: "#FFFFFF80",
+    color: theme.colors.onImage.ghost,
     marginTop: 4,
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowColor: theme.colors.shadow.medium,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },

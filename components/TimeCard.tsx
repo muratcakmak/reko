@@ -104,7 +104,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     },
     darkGradientOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.3)',
+        backgroundColor: theme.colors.overlay.light,
     },
     overlayList: {
         flex: 1,
@@ -125,51 +125,39 @@ const createStyles = (theme: any) => StyleSheet.create({
     daysValueList: {
         fontSize: 32, // Large as seen in screenshot "In 30 days"
         fontWeight: "800",
-        color: "#FFFFFF",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
+        color: theme.colors.onImage.primary,
+        ...theme.effects.textShadow.md,
     },
     daysValueGrid: {
         fontSize: 24, // Smaller for grid
         fontWeight: "800",
-        color: "#FFFFFF",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
+        color: theme.colors.onImage.primary,
+        ...theme.effects.textShadow.md,
     },
     titleList: {
         fontSize: 18,
         fontWeight: "700",
-        color: "#FFFFFF",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
+        color: theme.colors.onImage.primary,
+        ...theme.effects.textShadow.md,
     },
     titleGrid: {
         fontSize: 15, // Smaller for grid
         fontWeight: "700",
-        color: "#FFFFFF",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
+        color: theme.colors.onImage.primary,
+        ...theme.effects.textShadow.md,
     },
     subtitleList: {
         fontSize: 14,
         fontWeight: "500",
-        color: "rgba(255, 255, 255, 0.9)",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
+        color: theme.colors.onImage.secondary,
+        ...theme.effects.textShadow.sm,
         marginTop: 2,
     },
     subtitleGrid: {
         fontSize: 12, // Smaller for grid
         fontWeight: "500",
-        color: "rgba(255, 255, 255, 0.9)",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
+        color: theme.colors.onImage.secondary,
+        ...theme.effects.textShadow.sm,
         marginTop: 2,
     },
 });

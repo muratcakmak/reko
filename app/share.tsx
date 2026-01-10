@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { StyleSheet, View, Text, Pressable, Switch, useColorScheme, Platform } from "react-native";
+import { StyleSheet, View, Text, Pressable, Switch, Platform } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import Svg, { Path, Polygon } from "react-native-svg";
 import { Button, ContextMenu, Host } from "@expo/ui/swift-ui";
@@ -17,25 +17,12 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+import { useUnistyles } from "react-native-unistyles";
 
 // Type definitions
 type ThemeType = "Dark" | "Light";
 type ColorType = "White" | "Blue" | "Green" | "Orange" | "Yellow" | "Pink" | "Red" | "Mint" | "Purple" | "Brown";
 type ShapeType = "Dots" | "Squares" | "Stars" | "Diamonds" | "Hexagons" | "Hearts" | "X" | "Hash";
-
-// Color configurations
-const colorConfig: Record<ColorType, { dot: string; lightBg: string; passedDark: string; passedLight: string }> = {
-  White: { dot: "#000000", lightBg: "#F5F5F7", passedDark: "#3A3A3C", passedLight: "#C7C7CC" },
-  Blue: { dot: "#007AFF", lightBg: "#E8F4FD", passedDark: "#1C3A5F", passedLight: "#B3D4FC" },
-  Green: { dot: "#34C759", lightBg: "#E8F8EC", passedDark: "#1C4D2A", passedLight: "#B3E8C2" },
-  Orange: { dot: "#FF9500", lightBg: "#FFF4E6", passedDark: "#5F3A1C", passedLight: "#FFDDB3" },
-  Yellow: { dot: "#FFCC00", lightBg: "#FFFBE6", passedDark: "#5F4D1C", passedLight: "#FFECB3" },
-  Pink: { dot: "#FF2D55", lightBg: "#FFE8EC", passedDark: "#5F1C2A", passedLight: "#FFB3C2" },
-  Red: { dot: "#FF3B30", lightBg: "#FFE8E7", passedDark: "#5F1C1C", passedLight: "#FFB3B0" },
-  Mint: { dot: "#00C7BE", lightBg: "#E6FAF9", passedDark: "#1C4D4A", passedLight: "#B3F0ED" },
-  Purple: { dot: "#AF52DE", lightBg: "#F5E8FA", passedDark: "#3D1C5F", passedLight: "#E0B3F0" },
-  Brown: { dot: "#A2845E", lightBg: "#F5F0E8", passedDark: "#4D3A2A", passedLight: "#D4C4B0" },
-};
 
 // Shape rendering components
 function ShapeRenderer({
@@ -163,14 +150,15 @@ function MiniDotGrid({
   color: ColorType;
   shape: ShapeType;
 }) {
+  const { theme: appTheme } = useUnistyles();
   const columns = getMiniGridColumns(viewType, total);
   const dotSize = viewType === "year" || total > 100 ? 4 : 6;
   const gap = 2;
 
-  const config = colorConfig[color];
+  const config = appTheme.colors.share.palette[color];
   const passedColor = theme === "Dark" ? config.passedDark : config.passedLight;
   const remainingColor = theme === "Dark"
-    ? (color === "White" ? "#FFFFFF" : config.dot)
+    ? (color === "White" ? appTheme.colors.onImage.primary : config.dot)
     : config.dot;
 
   return (
@@ -211,6 +199,9 @@ function MenuPicker<T extends string>({
   options: readonly T[];
   onSelect: (option: T) => void;
 }) {
+  const { theme } = useUnistyles();
+  const styles = createStyles(theme);
+
   if (Platform.OS !== "ios") {
     // Fallback for non-iOS
     return (
@@ -252,15 +243,18 @@ function ToggleItem({
   value: boolean;
   onValueChange: (value: boolean) => void;
 }) {
+  const { theme } = useUnistyles();
+  const styles = createStyles(theme);
+
   return (
     <View style={styles.toggleItem}>
       <Text style={styles.toggleLabel}>{label}</Text>
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: "#39393D", true: "#34C759" }}
-        thumbColor="#FFFFFF"
-        ios_backgroundColor="#39393D"
+        trackColor={{ false: theme.colors.controlTrackOff, true: theme.colors.controlTrackOn }}
+        thumbColor={theme.colors.onImage.primary}
+        ios_backgroundColor={theme.colors.controlTrackOff}
       />
     </View>
   );
@@ -272,7 +266,8 @@ const colorOptions: ColorType[] = ["White", "Blue", "Green", "Orange", "Yellow",
 const shapeOptions: ShapeType[] = ["Dots", "Squares", "Stars", "Diamonds", "Hexagons", "Hearts", "X", "Hash"];
 
 export default function ShareScreen() {
-  const colorScheme = useColorScheme();
+  const { theme: appTheme } = useUnistyles();
+  const styles = createStyles(appTheme);
   const params = useLocalSearchParams<{
     label: string;
     timeLeftText: string;
@@ -331,8 +326,8 @@ export default function ShareScreen() {
     Haptics.selectionAsync();
   };
 
-  const isDark = theme === "Dark";
-  const config = colorConfig[color];
+  const isDarkShare = theme === "Dark";
+  const config = appTheme.colors.share.palette[color];
 
   const viewShotRef = useRef<ViewShot>(null);
   const [isSharing, setIsSharing] = useState(false);
@@ -406,9 +401,9 @@ export default function ShareScreen() {
   };
 
   // Get preview card background color
-  const previewBgColor = isDark ? "#2C2C2E" : config.lightBg;
-  const yearColor = isDark ? config.dot : config.dot;
-  const footerColor = isDark ? "#8E8E93" : "#8E8E93";
+  const previewBgColor = isDarkShare ? appTheme.colors.systemGray5 : config.lightBg;
+  const yearColor = config.dot;
+  const footerColor = appTheme.colors.systemGray;
 
   return (
     <View style={styles.container}>
@@ -503,7 +498,7 @@ export default function ShareScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
@@ -550,11 +545,11 @@ const styles = StyleSheet.create({
   pickerValue: {
     fontSize: 17,
     fontWeight: "400",
-    color: "#FFFFFF",
+    color: theme.colors.onImage.primary,
   },
   pickerChevron: {
     fontSize: 10,
-    color: "#8E8E93",
+    color: theme.colors.systemGray,
     transform: [{ rotate: "180deg" }],
     marginTop: 2,
   },
@@ -570,17 +565,17 @@ const styles = StyleSheet.create({
   },
   toggleLabel: {
     fontSize: 13,
-    color: "#FFFFFF",
+    color: theme.colors.onImage.primary,
   },
   shareButton: {
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
-    backgroundColor: "#007AFF",
+    backgroundColor: theme.colors.systemBlue,
   },
   shareButtonText: {
     fontSize: 17,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: theme.colors.onImage.primary,
   },
 });

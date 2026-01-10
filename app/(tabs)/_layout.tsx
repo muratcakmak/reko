@@ -1,9 +1,17 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
+import { useUnistyles } from "react-native-unistyles";
+import { useAccentColor } from "../../utils/storage";
 
 
 export default function TabLayout() {
+  const { theme } = useUnistyles();
+  const accentColorName = useAccentColor();
+  const accentColor = theme.colors.accent[accentColorName].primary;
+
   return (
-    <NativeTabs>
+    <NativeTabs
+      tintColor={accentColor}
+    >
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Left</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon

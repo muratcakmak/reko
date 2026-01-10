@@ -5,9 +5,8 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { SymbolView } from "expo-symbols";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { getUserProfile, useAccentColor, type AccentColor, getLifespan } from "../../utils/storage";
+import { getUserProfile, useAccentColor, getLifespan } from "../../utils/storage";
 import { useUnistyles } from "react-native-unistyles";
-import { accentColors } from "../../constants/theme";
 import { AdaptivePillButton } from "../../components/ui";
 import * as Haptics from "expo-haptics";
 import Animated, {
@@ -31,6 +30,8 @@ function PreciseCountdown({
   textColor: string;
   secondaryTextColor: string;
 }) {
+  const { theme } = useUnistyles();
+  const styles = createStyles(theme);
   const [timeLeft, setTimeLeft] = useState("");
 
   useEffect(() => {
@@ -83,13 +84,13 @@ function PreciseCountdown({
 
 export default function YouScreen() {
   const { theme } = useUnistyles();
-  const themeColors = theme.colors;
+  const styles = createStyles(theme);
   const insets = useSafeAreaInsets();
-  const isDark = theme.colors.background === '#000000' || theme.colors.background === '#111111';
+  const isDark = theme.isDark;
 
   // Local accent color logic
   const accentColorName = useAccentColor();
-  const accent = accentColors[accentColorName];
+  const accent = theme.colors.accent[accentColorName];
   const accentColor = isDark ? accent.secondary : accent.primary;
   // Initialize state synchronously to prevent CLS (flash of "No Profile")
   const [profile, setProfile] = useState<{ name: string; birthDate: Date | null }>(() => {
@@ -101,13 +102,6 @@ export default function YouScreen() {
   const [lifespan, setLifespanValue] = useState(() => getLifespan());
 
   const lastLoadedProfileRef = useRef<string | null>(null);
-
-  const colors = {
-    background: themeColors.background,
-    text: themeColors.textPrimary,
-    secondaryText: themeColors.textSecondary,
-    cardBg: themeColors.card,
-  };
 
   // Haptic feedback helper
   const triggerHaptic = () => {
@@ -214,12 +208,12 @@ export default function YouScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerSpacer} />
         <AdaptivePillButton onPress={openSettings} style={styles.pillButton}>
-          <Ionicons name="settings-outline" size={20} color={colors.text} />
+          <Ionicons name="settings-outline" size={20} color={theme.colors.textPrimary} />
         </AdaptivePillButton>
       </View>
 
@@ -234,20 +228,20 @@ export default function YouScreen() {
           {/* Profile Card */}
           <Pressable onPress={handleCardTap}>
             <Animated.View style={[styles.profileCard, { backgroundColor: accentColor }, cardAnimatedStyle]}>
-              <Ionicons name="person" size={80} color="rgba(255, 255, 255, 0.6)" />
+              <Ionicons name="person" size={80} color={theme.colors.onImage.faint} />
             </Animated.View>
           </Pressable>
 
           {hasProfile && profile.birthDate ? (
             <>
-              <Text style={[styles.profileName, { color: colors.text }]}>{profile.name}</Text>
+              <Text style={[styles.profileName, { color: theme.colors.textPrimary }]}>{profile.name}</Text>
 
               {/* Precise Countdown */}
               <PreciseCountdown
                 birthDate={profile.birthDate}
                 lifespan={lifespan}
-                textColor={colors.text}
-                secondaryTextColor={colors.secondaryText}
+                textColor={theme.colors.textPrimary}
+                secondaryTextColor={theme.colors.textSecondary}
               />
 
               {/* Graphs */}
@@ -256,14 +250,12 @@ export default function YouScreen() {
                   ageYears={calculateExactAge(profile.birthDate)}
                   lifespan={lifespan}
                   accentColor={accentColor}
-                  isDark={isDark}
-                  themeColors={themeColors}
                 />
               </View>
             </>
           ) : (
             <>
-              <Text style={[styles.descriptionText, { color: colors.secondaryText }]}>
+              <Text style={[styles.descriptionText, { color: theme.colors.textSecondary }]}>
                 Set up your profile to unlock personalized insights and visual reflections based on your age and lifespan.
               </Text>
               <Pressable style={[styles.setupButton, { backgroundColor: accentColor }]} onPress={openSettings}>
@@ -277,7 +269,7 @@ export default function YouScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -314,11 +306,7 @@ const styles = StyleSheet.create({
     borderRadius: 35,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    ...theme.effects.shadow.card,
     marginBottom: 20,
   },
   profileName: {
@@ -347,7 +335,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   setupButtonText: {
-    color: "#FFFFFF",
+    color: theme.colors.onImage.primary,
     fontSize: 17,
     fontWeight: "600",
   },

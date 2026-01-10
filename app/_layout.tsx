@@ -26,7 +26,6 @@ export default function RootLayout() {
 
   // Use Unistyles
   const { theme } = useUnistyles();
-  const colors = theme.colors;
 
   // Sync events to widget storage on app start
   useEffect(() => {
@@ -45,7 +44,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-      <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.background }}>
         <ThemeProvider
           value={isDark ? DarkTheme : DefaultTheme}
         >
@@ -68,8 +67,8 @@ export default function RootLayout() {
                 sheetAllowedDetents: [0.6],
                 contentStyle: {
                   backgroundColor: useGlass
-                    ? "transparent"
-                    : colors.surfaceElevated, // Safer fallback than 'card'
+                    ? theme.colors.transparent
+                    : theme.colors.surfaceElevated, // Safer fallback than 'card'
                 },
                 headerBlurEffect: useGlass
                   ? undefined
@@ -87,8 +86,8 @@ export default function RootLayout() {
                 sheetAllowedDetents: [0.6, 1.0],
                 contentStyle: {
                   backgroundColor: useGlass
-                    ? "transparent"
-                    : colors.surface,
+                    ? theme.colors.transparent
+                    : theme.colors.surface,
                 },
               }}
             />
@@ -97,7 +96,7 @@ export default function RootLayout() {
               options={{
                 headerShown: false,
                 presentation: "card",
-                contentStyle: { backgroundColor: "#000000" },
+                contentStyle: { backgroundColor: theme.colors.background },
               }}
             />
           </Stack>
