@@ -26,7 +26,6 @@ export default function RootLayout() {
 
   // Use Unistyles
   const { theme } = useUnistyles();
-  const colors = theme.colors;
 
   // Sync events to widget storage on app start
   useEffect(() => {
@@ -45,72 +44,62 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-      <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.background }}>
         <ThemeProvider
           value={isDark ? DarkTheme : DefaultTheme}
         >
           <StatusBar style={isDark ? "light" : "dark"} />
 
-        <Stack>
-          <Stack.Screen
-            name="(tabs)"
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="share"
-            options={{
-              headerTransparent: true,
-              title: "",
-              presentation: useGlass ? "formSheet" : "modal",
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: [0.6],
-              contentStyle: {
-                backgroundColor: useGlass
-                  ? "transparent"
-                  : colors.surfaceElevated, // Safer fallback than 'card'
-              },
-              headerBlurEffect: useGlass
-                ? undefined
-                : isDark ? "systemMaterialDark" : "systemMaterialLight",
-            }}
-          />
-          <Stack.Screen
-            name="event/[id]"
-            options={{
-              headerTransparent: true,
-              title: "",
-              presentation: useGlass ? "formSheet" : "modal",
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: [0.8, 1.0],
-              contentStyle: {
-                backgroundColor: useGlass
-                  ? "transparent"
-                  : colors.background,
-              },
-              headerBlurEffect: useGlass
-                ? undefined
-                : isDark ? "systemMaterialDark" : "systemMaterialLight",
-            }}
-          />
-          <Stack.Screen
-            name="settings"
-            options={{
-              headerTransparent: true,
-              headerShown: false,
-              title: "",
-              presentation: useGlass ? "formSheet" : "modal",
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: [0.6, 1.0],
-              contentStyle: {
-                backgroundColor: useGlass
-                  ? "transparent"
-                  : colors.surface,
-              },
-            }}
-          />
-        </Stack>
+          <Stack>
+            <Stack.Screen
+              name="(tabs)"
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="share"
+              options={{
+                headerTransparent: true,
+                title: "",
+                presentation: useGlass ? "formSheet" : "modal",
+                sheetGrabberVisible: true,
+                sheetAllowedDetents: [0.6],
+                contentStyle: {
+                  backgroundColor: useGlass
+                    ? theme.colors.transparent
+                    : theme.colors.surfaceElevated, // Safer fallback than 'card'
+                },
+                headerBlurEffect: useGlass
+                  ? undefined
+                  : isDark ? "systemMaterialDark" : "systemMaterialLight",
+              }}
+            />
+            <Stack.Screen
+              name="settings"
+              options={{
+                headerTransparent: true,
+                headerShown: false,
+                title: "",
+                presentation: useGlass ? "formSheet" : "modal",
+                sheetGrabberVisible: true,
+                sheetAllowedDetents: [0.6, 1.0],
+                contentStyle: {
+                  backgroundColor: useGlass
+                    ? theme.colors.transparent
+                    : theme.colors.surface,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="event/[id]"
+              options={{
+                headerShown: false,
+                presentation: "card",
+                contentStyle: { backgroundColor: theme.colors.background },
+              }}
+            />
+          </Stack>
         </ThemeProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>

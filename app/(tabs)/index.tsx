@@ -29,7 +29,6 @@ import {
   useLifeUnit,
   getLifeUnit,
 } from "../../utils/storage";
-import { accentColors } from "../../constants/theme";
 import { useUnistyles } from "react-native-unistyles";
 
 // View types
@@ -93,14 +92,7 @@ function getLifeInfo() {
 
   let total, passed, left, label;
 
-  if (lifeUnit === "weeks") {
-    total = lifespan * 52;
-    const diffTime = Math.abs(now.getTime() - birthDate.getTime());
-    const passedWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
-    passed = passedWeeks;
-    left = total - passed;
-    label = `${lifespan} Years`; // Keep label as Years generally? Or "In Weeks"? Let's stick to lifespan in years as title usually.
-  } else if (lifeUnit === "months") {
+  if (lifeUnit === "months") {
     total = lifespan * 12;
     passed = (now.getFullYear() - birthDate.getFullYear()) * 12 + (now.getMonth() - birthDate.getMonth());
     left = total - passed;
@@ -158,7 +150,6 @@ function formatTimeLeft(left: number, viewType: ViewType, isCountdown?: boolean)
       return `${left} hours left`;
     case "life": {
       const unit = getLifeUnit();
-      if (unit === "weeks") return `${left} Weeks left`;
       if (unit === "months") return `${left} Months left`;
       return `${left} Years left`;
     }
@@ -203,12 +194,7 @@ function getDotLabel(dotIndex: number, viewType: ViewType, eventStartDate?: stri
       const birthDate = profile?.birthDate ? new Date(profile.birthDate) : new Date(now.getFullYear() - 25, 0, 1);
       const unit = getLifeUnit();
 
-      if (unit === "weeks") {
-        const totalWeeks = dotIndex;
-        const years = Math.floor(totalWeeks / 52);
-        const weeks = totalWeeks % 52;
-        return `${years}y ${weeks}w`;
-      } else if (unit === "months") {
+      if (unit === "months") {
         const totalMonths = dotIndex;
         const ageYears = Math.floor(totalMonths / 12);
         const ageMonths = totalMonths % 12;
@@ -248,7 +234,6 @@ function getColumns(viewType: ViewType, total: number): number {
       return 14;
     case "life": {
       const unit = getLifeUnit();
-      if (unit === "weeks") return 52; // 52 weeks per year (good ratio for ~80 years)
       if (unit === "months") return 24; // 24 months/row (2 years) -> fills screen better than 12
       return 7; // ~70-90 years -> 7 cols gives ~10-13 rows (good vertical feel)
     }
@@ -464,15 +449,13 @@ export default function LeftScreen() {
   const lifeSymbol = useLifeSymbol();
   // Listen to unit changes to force re-render
   useLifeUnit();
-  const accent = accentColors[accentColorName];
+  const accent = theme.colors.accent[accentColorName];
   // Determine if dark mode using Unistyles theme check? 
   // theme names in Unistyles are 'light', 'dark'. 
   // But strictly, Unistyles theme object itself doesn't expose 'name' unless we check UnistylesRuntime.themeName
   // Or purely rely on our isDark boolean if we put it in theme?
   // We did put `isDark` boolean in the theme object in theme/unistyles.ts via ...lightColors/darkColors?
-  // No, `isDark` was in `AppTheme` type but not in `lightColors/darkColors` exports in `constants/theme.ts`.
-  // `constants/theme.ts` default export had `isDark` if using `getColors`.
-  // But `lightColors` const itself didn't have `isDark`.
+  // No, `isDark` was in `AppTheme` type but not in `lightColors/darkColors` exports.
 
   // Let's rely on UnistylesRuntime or just check a robust property.
   // Actually, let's just use a default or assume light/dark based on backgroundColor? swizzle?
@@ -480,14 +463,14 @@ export default function LeftScreen() {
   // const isDark = UnistylesRuntime.themeName === 'dark'
 
   // BUT: Unistyles `useStyles` returns `theme`.
-  // I can check `theme.colors.background` === '#000000' etc if I really need to.
+  // Avoid checking background color strings; rely on theme.isDark.
   // Or just update my `theme/unistyles.ts` to include `type: 'light' | 'dark'` meta property.
   // For now, I'll use a hack or `UnistylesRuntime`. I'll assume `theme.colors.background` black-ish is dark.
 
   // Wait, I can just use `UnistylesRuntime.themeName`.
 
   // Re-evaluating: I'll stick to simple logic.
-  const isDark = theme.colors.background === '#000000' || theme.colors.background === '#111111'; // Approximate
+  const isDark = theme.isDark;
   const accentColor = isDark ? accent.secondary : accent.primary;
 
   const [viewConfig, setViewConfig] = useState<ViewConfig>({ type: "year" });
@@ -505,15 +488,8 @@ export default function LeftScreen() {
     setAheadEvents(getAheadEvents());
   }, []);
 
-  // Theme colors
-  const colors = {
-    background: theme.colors.background,
-    cardBackground: theme.colors.card,
-    text: theme.colors.textPrimary,
-    secondaryText: theme.colors.textSecondary,
-    passedDot: isDark ? "#3A3A3C" : "#C7C7CC",
-    remainingDot: accentColor,
-  };
+  const passedDot = isDark ? theme.colors.systemGray4 : theme.colors.systemGray3;
+  const remainingDot = accentColor;
 
   // Get view info based on current view config
   const viewInfo = (() => {
@@ -578,7 +554,6 @@ export default function LeftScreen() {
   const getBaseGap = () => {
     if (viewConfig.type === "life") {
       const unit = getLifeUnit();
-      if (unit === "weeks") return 1.5;
       if (unit === "months") return 2;
     }
     if (viewConfig.type === "now" || viewConfig.type === "today") return 10;
@@ -685,8 +660,8 @@ export default function LeftScreen() {
             columns={columns}
             dotSize={dotSize}
             dotGap={dotGap}
-            passedColor={colors.passedDot}
-            remainingColor={colors.remainingDot}
+            passedColor={passedDot}
+            remainingColor={remainingDot}
             symbol={lifeSymbol}
           />
           <SelectionHighlight
@@ -695,7 +670,7 @@ export default function LeftScreen() {
             cellSize={cellSize}
             columns={columns}
             total={total}
-            color={colors.remainingDot}
+            color={remainingDot}
           />
         </Animated.View>
       </GestureDetector>
@@ -703,7 +678,7 @@ export default function LeftScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         {Platform.OS === "ios" ? (
@@ -736,7 +711,7 @@ export default function LeftScreen() {
               <ContextMenu.Trigger>
                 <View>
                   <AdaptivePillButton style={styles.pillButton}>
-                    <Text style={[styles.labelText, { color: colors.text }]}>{label}</Text>
+                    <Text style={[styles.labelText, { color: theme.colors.textPrimary }]}>{label}</Text>
                   </AdaptivePillButton>
                 </View>
               </ContextMenu.Trigger>
@@ -755,28 +730,30 @@ export default function LeftScreen() {
               }
             }}
           >
-            <Text style={[styles.labelText, { color: colors.text }]}>{label}</Text>
+            <Text style={[styles.labelText, { color: theme.colors.textPrimary }]}>{label}</Text>
           </AdaptivePillButton>
         )}
 
         <View style={styles.headerRight}>
           <AdaptivePillButton style={styles.pillButton}>
-            <Text style={[styles.daysLeftText, { color: colors.text }]}>
+            <Text style={[styles.daysLeftText, { color: theme.colors.textPrimary }]}>
               {selectedDotLabel || timeLeftText}
             </Text>
           </AdaptivePillButton>
 
           <AdaptivePillButton style={[styles.pillButton, styles.shareButton]} onPress={openShareSheet}>
-            <Ionicons name="share-outline" size={20} color={colors.text} />
+            <Ionicons name="share-outline" size={20} color={theme.colors.textPrimary} />
           </AdaptivePillButton>
         </View>
       </View>
 
       {/* Dot Grid Card - Adaptive for iOS 18+ and fallback */}
       <View style={styles.cardContainer}>
-        <AdaptiveCard style={styles.gridCard} useBlurFallback={false} fallbackBackgroundColor="#000000">
-          {gridContent}
-        </AdaptiveCard>
+        <View style={styles.cardShadowWrapper}>
+          <AdaptiveCard style={styles.gridCard} useBlurFallback={false}>
+            {gridContent}
+          </AdaptiveCard>
+        </View>
       </View>
     </View>
   );
@@ -821,12 +798,22 @@ const createStyles = (theme: any) => StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: 100,
   },
+  cardShadowWrapper: {
+    flex: 1,
+    // Premium float effect
+    shadowColor: theme.colors.textPrimary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
   gridCard: {
     flex: 1,
     borderRadius: theme.borderRadius.lg,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder, // Use theme token, remove complexity
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.cardBorder,
+    backgroundColor: theme.colors.background,
   },
   dotsContainer: {
     flex: 1,

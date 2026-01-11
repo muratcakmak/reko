@@ -30,7 +30,18 @@ export function refreshWidgets(): void {
 }
 
 // Image storage directory
-const getImageDir = () => new Directory(Paths.document, "images");
+const getImageDir = () => {
+  if (Platform.OS === "ios") {
+    const groupPath = WidgetSync.getGroupContainerPath();
+    if (groupPath) {
+      // Use the shared App Group container
+      // Note: We append "images" to keep it organized
+      return new Directory(groupPath, "images");
+    }
+  }
+  // Fallback to private documents directory
+  return new Directory(Paths.document, "images");
+};
 
 // Ensure image directory exists
 async function ensureImageDir() {
@@ -40,7 +51,65 @@ async function ensureImageDir() {
   }
 }
 
+// Helper: Normalize image storage path
+// Stores strictly relative path (filename) to persist across app updates/UUID changes
+function makeImageRelative(uri: string | undefined): string | undefined {
+  if (!uri) return undefined;
+
+  // If it's already just a filename (no slashes), return it
+  if (!uri.includes("/")) return uri;
+
+  // Extract filename from any path containing /images/
+  // Works for both Documents and App Group container paths
+  if (uri.includes("/images/")) {
+    return uri.split("/images/").pop();
+  }
+
+  // Fallback: extract just the filename from any path
+  return uri.split("/").pop();
+}
+
+// Helper: Hydrate image path for usage
+// Reconstructs valid absolute URI for the current app execution context
+function resolveImageUri(path: string | undefined): string | undefined {
+  if (!path) return undefined;
+
+  // If it looks like a full URI (e.g. file:// or https://), check validity
+  if (path.startsWith("file://") || path.startsWith("http")) {
+    // If it's a file URI, it might be stale (old UUID). 
+    // We try to rescue it by extracting the filename and checking current storage.
+    if (path.startsWith("file://")) {
+      const filename = path.split("/").pop();
+      if (filename) {
+        // 1. Check current Shared Container
+        const sharedFile = new File(getImageDir(), filename);
+        if (sharedFile.exists) return sharedFile.uri;
+
+        // 2. Fallback: Check Legacy Documents Directory (pre-WidgetSync)
+        const legacyFile = new File(Paths.document + "/images/" + filename);
+        if (legacyFile.exists) return legacyFile.uri;
+      }
+      return path;
+    }
+    return path;
+  }
+
+  // If it's just a filename
+  // 1. Check Shared Container
+  const sharedFile = new File(getImageDir(), path);
+  if (sharedFile.exists) return sharedFile.uri;
+
+  // 2. Fallback: Check Legacy Documents Directory
+  const legacyFile = new File(Paths.document + "/images/" + path);
+  if (legacyFile.exists) return legacyFile.uri;
+
+  // Default to shared path if neither exists (will likely fail to load but is correct "current" path)
+  return sharedFile.uri;
+}
+
 // Save image locally and return local URI
+// NOTE: Returns ABSOLUTE URI for immediate UI usage.
+// You must rely on saveAheadEvents/saveSinceEvents to strip this to relative path for storage.
 export async function saveImageLocally(uri: string): Promise<string> {
   await ensureImageDir();
   const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
@@ -86,27 +155,37 @@ export function getAheadEvents(): AheadEvent[] {
   const data = storage.getString(AHEAD_EVENTS_KEY);
   if (!data) return [];
   try {
-    return JSON.parse(data);
+    const events: AheadEvent[] = JSON.parse(data);
+    return events.map(event => ({
+      ...event,
+      image: resolveImageUri(event.image)
+    }));
   } catch {
     return [];
   }
 }
 
 export function saveAheadEvents(events: AheadEvent[]): void {
-  const json = JSON.stringify(events);
+  // Store only relative paths
+  const cleanEvents = events.map(event => ({
+    ...event,
+    image: makeImageRelative(event.image)
+  }));
+
+  const json = JSON.stringify(cleanEvents);
   storage.set(AHEAD_EVENTS_KEY, json);
   syncToWidgetStorage(AHEAD_EVENTS_KEY, json);
   refreshWidgets();
 }
 
 export function addAheadEvent(event: Omit<AheadEvent, "id">): AheadEvent {
-  const events = getAheadEvents();
+  const events = getAheadEvents(); // Returns absolute URIs
   const newEvent: AheadEvent = {
     ...event,
     id: Date.now().toString(),
   };
   events.push(newEvent);
-  saveAheadEvents(events);
+  saveAheadEvents(events); // Strips to relative
   return newEvent;
 }
 
@@ -121,14 +200,24 @@ export function getSinceEvents(): SinceEvent[] {
   const data = storage.getString(SINCE_EVENTS_KEY);
   if (!data) return [];
   try {
-    return JSON.parse(data);
+    const events: SinceEvent[] = JSON.parse(data);
+    return events.map(event => ({
+      ...event,
+      image: resolveImageUri(event.image)
+    }));
   } catch {
     return [];
   }
 }
 
 export function saveSinceEvents(events: SinceEvent[]): void {
-  const json = JSON.stringify(events);
+  // Store only relative paths
+  const cleanEvents = events.map(event => ({
+    ...event,
+    image: makeImageRelative(event.image)
+  }));
+
+  const json = JSON.stringify(cleanEvents);
   storage.set(SINCE_EVENTS_KEY, json);
   syncToWidgetStorage(SINCE_EVENTS_KEY, json);
   refreshWidgets();
@@ -194,16 +283,17 @@ export function syncAllEventsToWidget(): void {
   if (Platform.OS !== "ios") return;
 
   try {
-    // Sync ahead events
-    const aheadEvents = getAheadEvents();
-    if (aheadEvents.length > 0) {
-      syncToWidgetStorage(AHEAD_EVENTS_KEY, JSON.stringify(aheadEvents));
+    // Sync ahead events - use raw MMKV data which has RELATIVE paths
+    // Widget will resolve these relative paths using the App Group container
+    const aheadEventsRaw = storage.getString(AHEAD_EVENTS_KEY);
+    if (aheadEventsRaw) {
+      syncToWidgetStorage(AHEAD_EVENTS_KEY, aheadEventsRaw);
     }
 
-    // Sync since events
-    const sinceEvents = getSinceEvents();
-    if (sinceEvents.length > 0) {
-      syncToWidgetStorage(SINCE_EVENTS_KEY, JSON.stringify(sinceEvents));
+    // Sync since events - use raw MMKV data which has RELATIVE paths
+    const sinceEventsRaw = storage.getString(SINCE_EVENTS_KEY);
+    if (sinceEventsRaw) {
+      syncToWidgetStorage(SINCE_EVENTS_KEY, sinceEventsRaw);
     }
 
     // Sync background mode for native theme initialization
@@ -212,10 +302,7 @@ export function syncAllEventsToWidget(): void {
 
     // Refresh widgets
     refreshWidgets();
-    console.log("[WidgetSync] Synced events to widget storage:", {
-      ahead: aheadEvents.length,
-      since: sinceEvents.length,
-    });
+    console.log("[WidgetSync] Synced events to widget storage");
   } catch (error) {
     console.log("[WidgetSync] Failed to sync:", error);
   }
@@ -277,6 +364,24 @@ export function setBackgroundMode(mode: BackgroundMode): void {
   NativeTheme.setNativeThemeMode(mode);
 }
 
+export function useBackgroundMode(): BackgroundMode {
+  const [mode, setMode] = useState<BackgroundMode>(getBackgroundMode());
+
+  useEffect(() => {
+    const listener = storage.addOnValueChangedListener((key) => {
+      if (key === BACKGROUND_MODE_KEY) {
+        setMode(getBackgroundMode());
+      }
+    });
+
+    return () => {
+      listener.remove();
+    };
+  }, []);
+
+  return mode;
+}
+
 // Accent Color Preference
 export type AccentColor = "white" | "blue" | "green" | "orange" | "yellow" | "pink" | "red" | "mint" | "purple" | "brown";
 
@@ -284,7 +389,7 @@ const ACCENT_COLOR_KEY = "accent_color";
 
 export function getAccentColor(): AccentColor {
   const color = storage.getString(ACCENT_COLOR_KEY);
-  return (color as AccentColor) || "blue";
+  return (color as AccentColor) || "orange";
 }
 
 export function setAccentColor(color: AccentColor): void {
@@ -375,8 +480,8 @@ const SHARE_SHOW_APP_KEY = "share_show_app";
 export function getSharePreferences() {
   return {
     theme: storage.getString(SHARE_THEME_KEY) || "Dark",
-    color: storage.getString(SHARE_COLOR_KEY) || "Red",
-    shape: storage.getString(SHARE_SHAPE_KEY) || "Stars",
+    color: storage.getString(SHARE_COLOR_KEY) || "Accent",
+    shape: storage.getString(SHARE_SHAPE_KEY) || "Dots",
     showTitle: storage.getBoolean(SHARE_SHOW_TITLE_KEY) ?? true,
     showTimeLeft: storage.getBoolean(SHARE_SHOW_TIME_LEFT_KEY) ?? true,
     showApp: storage.getBoolean(SHARE_SHOW_APP_KEY) ?? true,
@@ -398,3 +503,4 @@ export function setSharePreferences(prefs: {
   if (prefs.showTimeLeft !== undefined) storage.set(SHARE_SHOW_TIME_LEFT_KEY, prefs.showTimeLeft);
   if (prefs.showApp !== undefined) storage.set(SHARE_SHOW_APP_KEY, prefs.showApp);
 }
+

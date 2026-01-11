@@ -11,7 +11,7 @@ if (Platform.OS === "ios") {
   }
 }
 
-export const APP_GROUP_ID = "group.com.omc345.reko";
+export const APP_GROUP_ID = "group.com.omc345.rekoll";
 
 /**
  * Set an item in the App Group UserDefaults for widget access
@@ -51,11 +51,21 @@ export function reloadTimeline(kind: string): void {
   WidgetSync?.reloadTimeline?.(kind);
 }
 
+/**
+ * Get the absolute path to the App Group Shared Container
+ * Used for sharing files (images) between App and Widget
+ */
+export function getGroupContainerPath(): string | null {
+  if (!WidgetSync) return null;
+  return WidgetSync.getGroupContainerPath(APP_GROUP_ID);
+}
+
 export default {
   setItem,
   getItem,
   removeItem,
   reloadAllTimelines,
   reloadTimeline,
+  getGroupContainerPath,
   APP_GROUP_ID,
 };

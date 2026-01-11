@@ -1,10 +1,8 @@
 import React from "react";
 import { StyleSheet, View, Text, Pressable, ImageBackground, StyleProp, ViewStyle } from "react-native";
-import { FlashList } from "@shopify/flash-list";
-import { Image } from "expo-image";
+
+
 import { useUnistyles } from "react-native-unistyles";
-import { hasLiquidGlassSupport } from "../utils/capabilities";
-import { GlassView } from "expo-glass-effect";
 
 interface TimeCardProps {
     title: string;
@@ -70,27 +68,19 @@ export function TimeCard({
         </View>
     );
 
-    if (onPress) {
-        return (
-            <Pressable onPress={onPress} style={({ pressed }) => [style, pressed && { opacity: 0.9 }]}>
-                {InnerComponent}
-            </Pressable>
-        );
-    }
-
     return <View style={style}>{InnerComponent}</View>;
 }
 
 const createStyles = (theme: any) => StyleSheet.create({
     cardList: {
         width: "100%",
-        height: 180, // Fatter list items
+        height: 170, // Medium widget proportions
         borderRadius: theme.borderRadius.xl,
         overflow: "hidden",
     },
     cardGrid: {
         width: "100%",
-        height: 130, // Smaller for grid
+        height: "100%",
         borderRadius: theme.borderRadius.lg,
         overflow: "hidden",
     },
@@ -104,7 +94,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     },
     darkGradientOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.3)',
+        backgroundColor: theme.colors.overlay.light,
     },
     overlayList: {
         flex: 1,
@@ -125,51 +115,39 @@ const createStyles = (theme: any) => StyleSheet.create({
     daysValueList: {
         fontSize: 32, // Large as seen in screenshot "In 30 days"
         fontWeight: "800",
-        color: "#FFFFFF",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
+        color: theme.colors.onImage.primary,
+        ...theme.effects.textShadow.md,
     },
     daysValueGrid: {
         fontSize: 24, // Smaller for grid
         fontWeight: "800",
-        color: "#FFFFFF",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
+        color: theme.colors.onImage.primary,
+        ...theme.effects.textShadow.md,
     },
     titleList: {
         fontSize: 18,
         fontWeight: "700",
-        color: "#FFFFFF",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
+        color: theme.colors.onImage.primary,
+        ...theme.effects.textShadow.md,
     },
     titleGrid: {
         fontSize: 15, // Smaller for grid
         fontWeight: "700",
-        color: "#FFFFFF",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
+        color: theme.colors.onImage.primary,
+        ...theme.effects.textShadow.md,
     },
     subtitleList: {
         fontSize: 14,
         fontWeight: "500",
-        color: "rgba(255, 255, 255, 0.9)",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
+        color: theme.colors.onImage.secondary,
+        ...theme.effects.textShadow.sm,
         marginTop: 2,
     },
     subtitleGrid: {
         fontSize: 12, // Smaller for grid
         fontWeight: "500",
-        color: "rgba(255, 255, 255, 0.9)",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
+        color: theme.colors.onImage.secondary,
+        ...theme.effects.textShadow.sm,
         marginTop: 2,
     },
 });

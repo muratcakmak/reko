@@ -1,13 +1,15 @@
 import { useState, useRef } from "react";
-import { StyleSheet, View, Text, Pressable, Switch, useColorScheme, Platform } from "react-native";
+import { StyleSheet, View, Text, Pressable, Switch, Platform } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import Svg, { Path, Polygon } from "react-native-svg";
 import { Button, ContextMenu, Host } from "@expo/ui/swift-ui";
+import { tint } from "@expo/ui/swift-ui/modifiers";
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import {
   getSharePreferences,
   setSharePreferences,
+  useAccentColor,
 } from "../utils/storage";
 import * as Haptics from "expo-haptics";
 import Animated, {
@@ -17,25 +19,12 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+import { useUnistyles } from "react-native-unistyles";
 
 // Type definitions
 type ThemeType = "Dark" | "Light";
-type ColorType = "White" | "Blue" | "Green" | "Orange" | "Yellow" | "Pink" | "Red" | "Mint" | "Purple" | "Brown";
+type ColorType = "Accent" | "White" | "Blue" | "Green" | "Orange" | "Yellow" | "Pink" | "Red" | "Mint" | "Purple" | "Brown";
 type ShapeType = "Dots" | "Squares" | "Stars" | "Diamonds" | "Hexagons" | "Hearts" | "X" | "Hash";
-
-// Color configurations
-const colorConfig: Record<ColorType, { dot: string; lightBg: string; passedDark: string; passedLight: string }> = {
-  White: { dot: "#000000", lightBg: "#F5F5F7", passedDark: "#3A3A3C", passedLight: "#C7C7CC" },
-  Blue: { dot: "#007AFF", lightBg: "#E8F4FD", passedDark: "#1C3A5F", passedLight: "#B3D4FC" },
-  Green: { dot: "#34C759", lightBg: "#E8F8EC", passedDark: "#1C4D2A", passedLight: "#B3E8C2" },
-  Orange: { dot: "#FF9500", lightBg: "#FFF4E6", passedDark: "#5F3A1C", passedLight: "#FFDDB3" },
-  Yellow: { dot: "#FFCC00", lightBg: "#FFFBE6", passedDark: "#5F4D1C", passedLight: "#FFECB3" },
-  Pink: { dot: "#FF2D55", lightBg: "#FFE8EC", passedDark: "#5F1C2A", passedLight: "#FFB3C2" },
-  Red: { dot: "#FF3B30", lightBg: "#FFE8E7", passedDark: "#5F1C1C", passedLight: "#FFB3B0" },
-  Mint: { dot: "#00C7BE", lightBg: "#E6FAF9", passedDark: "#1C4D4A", passedLight: "#B3F0ED" },
-  Purple: { dot: "#AF52DE", lightBg: "#F5E8FA", passedDark: "#3D1C5F", passedLight: "#E0B3F0" },
-  Brown: { dot: "#A2845E", lightBg: "#F5F0E8", passedDark: "#4D3A2A", passedLight: "#D4C4B0" },
-};
 
 // Shape rendering components
 function ShapeRenderer({
@@ -155,6 +144,7 @@ function MiniDotGrid({
   theme,
   color,
   shape,
+  accentColor,
 }: {
   total: number;
   passed: number;
@@ -162,15 +152,29 @@ function MiniDotGrid({
   theme: ThemeType;
   color: ColorType;
   shape: ShapeType;
+  accentColor: string;
 }) {
+  const { theme: appTheme } = useUnistyles();
   const columns = getMiniGridColumns(viewType, total);
   const dotSize = viewType === "year" || total > 100 ? 4 : 6;
   const gap = 2;
 
-  const config = colorConfig[color];
+  let config;
+  if (color === "Accent") {
+    config = {
+      dot: accentColor,
+      lightBg: appTheme.colors.surface,
+      passedDark: appTheme.colors.systemGray5,
+      passedLight: appTheme.colors.systemGray3
+    };
+  } else {
+    // @ts-ignore
+    config = appTheme.colors.share.palette[color];
+  }
+
   const passedColor = theme === "Dark" ? config.passedDark : config.passedLight;
   const remainingColor = theme === "Dark"
-    ? (color === "White" ? "#FFFFFF" : config.dot)
+    ? (color === "White" ? appTheme.colors.onImage.primary : config.dot)
     : config.dot;
 
   return (
@@ -206,16 +210,21 @@ function MenuPicker<T extends string>({
   value,
   options,
   onSelect,
+  accentColor,
 }: {
   value: T;
   options: readonly T[];
   onSelect: (option: T) => void;
+  accentColor: string;
 }) {
+  const { theme } = useUnistyles();
+  const styles = createStyles(theme);
+
   if (Platform.OS !== "ios") {
     // Fallback for non-iOS
     return (
       <Pressable style={styles.pickerButton}>
-        <Text style={styles.pickerValue}>{value}</Text>
+        <Text style={[styles.pickerValue, { color: accentColor }]}>{value}</Text>
         <Text style={styles.pickerChevron}>⌃</Text>
       </Pressable>
     );
@@ -235,7 +244,7 @@ function MenuPicker<T extends string>({
           ))}
         </ContextMenu.Items>
         <ContextMenu.Trigger>
-          <Button label={`${value} ▾`} />
+          <Button label={`${value} ▾`} modifiers={[tint(accentColor)]} />
         </ContextMenu.Trigger>
       </ContextMenu>
     </Host>
@@ -247,20 +256,25 @@ function ToggleItem({
   label,
   value,
   onValueChange,
+  accentColor,
 }: {
   label: string;
   value: boolean;
   onValueChange: (value: boolean) => void;
+  accentColor: string;
 }) {
+  const { theme } = useUnistyles();
+  const styles = createStyles(theme);
+
   return (
     <View style={styles.toggleItem}>
       <Text style={styles.toggleLabel}>{label}</Text>
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: "#39393D", true: "#34C759" }}
-        thumbColor="#FFFFFF"
-        ios_backgroundColor="#39393D"
+        trackColor={{ false: theme.colors.controlTrackOff, true: accentColor }}
+        thumbColor={theme.colors.onImage.primary}
+        ios_backgroundColor={theme.colors.controlTrackOff}
       />
     </View>
   );
@@ -268,11 +282,14 @@ function ToggleItem({
 
 // Picker options
 const themeOptions: ThemeType[] = ["Dark", "Light"];
-const colorOptions: ColorType[] = ["White", "Blue", "Green", "Orange", "Yellow", "Pink", "Red", "Mint", "Purple", "Brown"];
+const colorOptions: ColorType[] = ["Accent", "White", "Blue", "Green", "Orange", "Yellow", "Pink", "Red", "Mint", "Purple", "Brown"];
 const shapeOptions: ShapeType[] = ["Dots", "Squares", "Stars", "Diamonds", "Hexagons", "Hearts", "X", "Hash"];
 
 export default function ShareScreen() {
-  const colorScheme = useColorScheme();
+  const { theme: appTheme } = useUnistyles();
+  const styles = createStyles(appTheme);
+  const accentColorName = useAccentColor();
+  const accentColor = appTheme.colors.accent[accentColorName].primary;
   const params = useLocalSearchParams<{
     label: string;
     timeLeftText: string;
@@ -330,9 +347,6 @@ export default function ShareScreen() {
     setSharePreferences({ showApp: val });
     Haptics.selectionAsync();
   };
-
-  const isDark = theme === "Dark";
-  const config = colorConfig[color];
 
   const viewShotRef = useRef<ViewShot>(null);
   const [isSharing, setIsSharing] = useState(false);
@@ -406,9 +420,23 @@ export default function ShareScreen() {
   };
 
   // Get preview card background color
-  const previewBgColor = isDark ? "#2C2C2E" : config.lightBg;
-  const yearColor = isDark ? config.dot : config.dot;
-  const footerColor = isDark ? "#8E8E93" : "#8E8E93";
+  let shareConfig;
+  if (color === "Accent") {
+    shareConfig = {
+      dot: accentColor,
+      lightBg: appTheme.colors.surface,
+      passedDark: appTheme.colors.systemGray5,
+      passedLight: appTheme.colors.systemGray3
+    };
+  } else {
+    // @ts-ignore
+    shareConfig = appTheme.colors.share.palette[color];
+  }
+
+  const isDarkShare = theme === "Dark";
+  const previewBgColor = isDarkShare ? appTheme.colors.systemGray5 : shareConfig.lightBg;
+  const yearColor = shareConfig.dot;
+  const footerColor = appTheme.colors.systemGray;
 
   return (
     <View style={styles.container}>
@@ -437,6 +465,7 @@ export default function ShareScreen() {
                   theme={theme}
                   color={color}
                   shape={shape}
+                  accentColor={accentColor}
                 />
               </View>
               {(showRekoApp || showTimeLeft) && (
@@ -468,24 +497,27 @@ export default function ShareScreen() {
           value={theme}
           options={themeOptions}
           onSelect={handleThemeChange}
+          accentColor={accentColor}
         />
         <MenuPicker
           value={color}
           options={colorOptions}
           onSelect={handleColorChange}
+          accentColor={accentColor}
         />
         <MenuPicker
           value={shape}
           options={shapeOptions}
           onSelect={handleShapeChange}
+          accentColor={accentColor}
         />
       </View>
 
       {/* Toggles Row */}
       <View style={styles.togglesRow}>
-        <ToggleItem label="Title" value={showTitle} onValueChange={handleShowTitleChange} />
-        <ToggleItem label="Time left" value={showTimeLeft} onValueChange={handleShowTimeLeftChange} />
-        <ToggleItem label="Left app" value={showRekoApp} onValueChange={handleShowRekoAppChange} />
+        <ToggleItem label="Title" value={showTitle} onValueChange={handleShowTitleChange} accentColor={accentColor} />
+        <ToggleItem label="Time left" value={showTimeLeft} onValueChange={handleShowTimeLeftChange} accentColor={accentColor} />
+        <ToggleItem label="Left app" value={showRekoApp} onValueChange={handleShowRekoAppChange} accentColor={accentColor} />
       </View>
 
       {/* Share Button */}
@@ -495,7 +527,7 @@ export default function ShareScreen() {
         onPressOut={handleButtonPressOut}
         disabled={isSharing}
       >
-        <Animated.View style={[styles.shareButton, buttonAnimatedStyle]}>
+        <Animated.View style={[styles.shareButton, buttonAnimatedStyle, { backgroundColor: accentColor }]}>
           <Text style={styles.shareButtonText}>Share</Text>
         </Animated.View>
       </Pressable>
@@ -503,7 +535,7 @@ export default function ShareScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
@@ -550,11 +582,11 @@ const styles = StyleSheet.create({
   pickerValue: {
     fontSize: 17,
     fontWeight: "400",
-    color: "#FFFFFF",
+    color: theme.colors.onImage.primary,
   },
   pickerChevron: {
     fontSize: 10,
-    color: "#8E8E93",
+    color: theme.colors.systemGray,
     transform: [{ rotate: "180deg" }],
     marginTop: 2,
   },
@@ -570,17 +602,17 @@ const styles = StyleSheet.create({
   },
   toggleLabel: {
     fontSize: 13,
-    color: "#FFFFFF",
+    color: theme.colors.onImage.primary,
   },
   shareButton: {
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
-    backgroundColor: "#007AFF",
+    backgroundColor: theme.colors.systemBlue,
   },
   shareButtonText: {
     fontSize: 17,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: theme.colors.onImage.primary,
   },
 });
