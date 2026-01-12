@@ -25,7 +25,6 @@ import Animated, {
   withTiming,
   withSpring,
   runOnJS,
-  interpolate,
 } from 'react-native-reanimated';
 import Svg, { Circle, Rect, Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
@@ -207,10 +206,6 @@ export const SwipeToFocus = memo(function SwipeToFocus({
     strokeDashoffset: circumference * (1 - progress.value),
   }));
 
-  const textOpacity = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 0.3], [1, 0]),
-  }));
-
   // VoiceOver accessible button
   const handleVoiceOverPress = useCallback(() => {
     triggerHaptic(mode === 'idle' ? 'success' : 'warning');
@@ -229,8 +224,6 @@ export const SwipeToFocus = memo(function SwipeToFocus({
   const iconColor = mode === 'idle'
     ? '#FFFFFF'
     : (theme.isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)');
-
-  const labelText = mode === 'idle' ? 'Hold to focus' : 'Hold to end';
 
   return (
     <View style={styles.container}>
@@ -281,16 +274,6 @@ export const SwipeToFocus = memo(function SwipeToFocus({
         </Animated.View>
       </GestureDetector>
 
-      {/* Label text */}
-      <Animated.Text
-        style={[
-          styles.label,
-          { color: theme.colors.textSecondary },
-          textOpacity,
-        ]}
-      >
-        {labelText}
-      </Animated.Text>
 
       {/* VoiceOver-only button */}
       <Pressable
@@ -369,11 +352,6 @@ const styles = StyleSheet.create({
   },
   playIcon: {
     marginLeft: 3, // Optical centering for play icon
-  },
-  label: {
-    marginTop: 16,
-    fontSize: 15,
-    fontWeight: '500',
   },
   voiceOverButton: {
     position: 'absolute',

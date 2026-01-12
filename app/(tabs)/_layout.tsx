@@ -18,6 +18,7 @@ export default function TabLayout() {
 
   return (
     <NativeTabs
+      initialRouteName="focus"
       tintColor={accentColor}
       blurEffect={blurEffect}
       disableTransparentOnScrollEdge={true}

@@ -405,9 +405,9 @@ const styles = StyleSheet.create({
   },
   debugInfo: {
     position: 'absolute',
-    left: 0,
+    left: 16,
     right: 0,
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   debugText: {
     fontSize: 11,
