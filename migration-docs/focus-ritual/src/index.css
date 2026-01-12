@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Odak Design System - Calm commitment ritual aesthetic */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    /* Core palette - Orange/White/Charcoal */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 10%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 10%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 10%;
+    
+    /* Vivid orange accent */
+    --primary: 38 92% 50%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Light gray secondary */
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 10% 10%;
+    
+    /* Muted for inactive dots */
+    --muted: 240 5% 90%;
+    --muted-foreground: 240 4% 46%;
+    
+    --accent: 38 92% 50%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 38 92% 50%;
+    
+    --radius: 1rem;
+    
+    /* Dot grid specific */
+    --dot-active: 38 92% 50%;
+    --dot-inactive: 240 5% 85%;
+    --dot-charging: 38 92% 60%;
+    --dot-break: 38 92% 95%;
+    
+    /* Shadows */
+    --shadow-soft: 0 2px 8px -2px hsl(0 0% 0% / 0.08);
+    --shadow-card: 0 4px 16px -4px hsl(0 0% 0% / 0.1);
+    --shadow-elevated: 0 8px 32px -8px hsl(0 0% 0% / 0.12);
+    
+    /* Break mode colors */
+    --break-background: 38 92% 50%;
+    --break-foreground: 0 0% 100%;
+    --break-dot: 0 0% 100%;
+  }
+
+  .dark {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+    
+    --card: 240 10% 8%;
+    --card-foreground: 0 0% 98%;
+    
+    --popover: 240 10% 8%;
+    --popover-foreground: 0 0% 98%;
+    
+    --primary: 38 92% 50%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 240 5% 16%;
+    --secondary-foreground: 0 0% 98%;
+    
+    --muted: 240 5% 20%;
+    --muted-foreground: 240 5% 65%;
+    
+    --accent: 38 92% 50%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 240 5% 20%;
+    --input: 240 5% 20%;
+    --ring: 38 92% 50%;
+    
+    --dot-active: 38 92% 50%;
+    --dot-inactive: 240 5% 30%;
+    --dot-charging: 38 92% 60%;
+    --dot-break: 38 92% 20%;
+    
+    --break-background: 38 92% 50%;
+    --break-foreground: 0 0% 100%;
+    --break-dot: 0 0% 100%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+  
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
