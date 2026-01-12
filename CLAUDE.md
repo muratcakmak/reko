@@ -15,12 +15,16 @@ If you think a change is beneficial (e.g., adding a big countdown), propose it a
 Never rely on a per-second timer loop as the source of truth.
 Use timestamps (`startedAt`, `endsAt`) and compute remaining time from `now`.
 
-### Keep UI minimal and consistent with Rekoll language
-- White surfaces, generous whitespace
-- One consistent orange accent
-- Rounded cards
-- Dot-grid visual motif
-Avoid “Apple marketing” imitation; keep it product-first.
+### Keep UI minimal and consistent with Rekoll design language
+Odak inherits the Rekoll visual system:
+- **White surfaces** with generous whitespace
+- **Orange accent**: `#FF9500` (light) / `#FF9F0A` (dark) — HSL 38° 92% 50%
+- **Rounded cards**: 16px (1rem) border radius
+- **Dot-grid visual motif**: time as texture
+- **Typography**: San Francisco (iOS), Inter (web)
+- **Spacing**: 8px baseline grid (xs=4, sm=8, md=16, lg=24)
+
+Avoid "Apple marketing" imitation; keep it product-first.
 
 ---
 
@@ -66,20 +70,25 @@ If adding new behaviors, update:
 - Works on small phones (layout)
 - Works after app restart
 - Includes tests for critical logic
-- Includes a short note in `Docs/DECISIONS.md` if it changes behavior
+- Includes a short note in `migration-docs/DECISIONS.md` if it changes behavior
 
 ---
 
 ## Quick product glossary
-- **Focus**: active commitment block (10/25/50)
-- **Break**: release block (default 5)
-- **Bank**: historical completed focus sessions
-- **Seal**: high-friction stop control
-- **Decaying Grid**: dot grid extinguishing per minute
+- **Focus**: active commitment block (Quick 10 / Standard 25 / Deep 50 minutes)
+- **Break**: release block (default 5 minutes, full orange background)
+- **Bank**: historical completed focus sessions (grouped by day)
+- **Seal**: high-friction stop control (2s long-press + confirm)
+- **Decaying Grid**: dot grid extinguishing one dot per minute
+- **Preset**: duration configuration (Quick 2×5, Standard 5×5, Deep 5×10 grids)
+- **Hold-to-start**: 2.5s commitment threshold gesture
+- **Charging**: visual feedback during hold-to-start (dots fill progressively)
 
 ---
 
 ## Helpful references
-- `PRODUCT.md` — scope and philosophy
-- `ENGINEERING.md` — architecture and system constraints
-- `Docs/QA_CHECKLIST.md` — manual test cases (create if missing)
+- `migration-docs/PRODUCT.md` — scope and philosophy
+- `migration-docs/ENGINEERING.md` — architecture and system constraints
+- `migration-docs/QA.md` — manual test cases
+- `migration-docs/DECISIONS.md` — architectural decisions log
+- `migration-docs/focus-ritual/` — web reference implementation (Vite + React + Tailwind)

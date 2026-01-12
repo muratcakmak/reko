@@ -22,6 +22,13 @@ export default function TabLayout() {
       blurEffect={blurEffect}
       disableTransparentOnScrollEdge={true}
     >
+      <NativeTabs.Trigger name="focus">
+        <NativeTabs.Trigger.Label>Focus</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf="circle.grid.3x3.fill"
+          drawable="ic_grid"
+        />
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Left</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon

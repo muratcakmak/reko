@@ -504,3 +504,167 @@ export function setSharePreferences(prefs: {
   if (prefs.showApp !== undefined) storage.set(SHARE_SHOW_APP_KEY, prefs.showApp);
 }
 
+// ============================================================================
+// FOCUS TIMER STORAGE (Odak Pomodoro)
+// ============================================================================
+
+import type {
+  FocusSession,
+  ActiveTimerState,
+  FocusSettings,
+  PresetId,
+} from "../domain/types";
+import { createDefaultSettings } from "../domain/TimerEngine";
+
+// Storage keys for focus timer
+const FOCUS_ACTIVE_TIMER_KEY = "focus_active_timer";
+const FOCUS_HISTORY_KEY = "focus_history";
+const FOCUS_SETTINGS_KEY = "focus_settings";
+const FOCUS_SELECTED_PRESET_KEY = "focus_selected_preset";
+
+// Current storage schema version
+const FOCUS_STORAGE_VERSION = 1;
+
+// Active Timer State (persists during focusing/break)
+export function getActiveTimer(): ActiveTimerState | null {
+  const data = storage.getString(FOCUS_ACTIVE_TIMER_KEY);
+  if (!data) return null;
+  try {
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
+}
+
+export function saveActiveTimer(timer: ActiveTimerState | null): void {
+  if (timer) {
+    storage.set(FOCUS_ACTIVE_TIMER_KEY, JSON.stringify(timer));
+  } else {
+    storage.delete(FOCUS_ACTIVE_TIMER_KEY);
+  }
+  // Sync to widget for live updates
+  syncToWidgetStorage(FOCUS_ACTIVE_TIMER_KEY, timer ? JSON.stringify(timer) : "");
+  refreshWidgets();
+}
+
+export function clearActiveTimer(): void {
+  storage.delete(FOCUS_ACTIVE_TIMER_KEY);
+  syncToWidgetStorage(FOCUS_ACTIVE_TIMER_KEY, "");
+  refreshWidgets();
+}
+
+// Focus Session History (Bank)
+export function getFocusHistory(): FocusSession[] {
+  const data = storage.getString(FOCUS_HISTORY_KEY);
+  if (!data) return [];
+  try {
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
+
+export function saveFocusHistory(sessions: FocusSession[]): void {
+  storage.set(FOCUS_HISTORY_KEY, JSON.stringify(sessions));
+}
+
+export function addFocusSession(session: FocusSession): void {
+  const history = getFocusHistory();
+  history.push(session);
+  saveFocusHistory(history);
+}
+
+export function clearFocusHistory(): void {
+  storage.delete(FOCUS_HISTORY_KEY);
+}
+
+// Focus Settings
+export function getFocusSettings(): FocusSettings {
+  const data = storage.getString(FOCUS_SETTINGS_KEY);
+  if (!data) return createDefaultSettings();
+  try {
+    const stored = JSON.parse(data);
+    // Merge with defaults to handle new fields
+    return { ...createDefaultSettings(), ...stored };
+  } catch {
+    return createDefaultSettings();
+  }
+}
+
+export function saveFocusSettings(settings: FocusSettings): void {
+  storage.set(FOCUS_SETTINGS_KEY, JSON.stringify({
+    ...settings,
+    version: FOCUS_STORAGE_VERSION,
+  }));
+}
+
+// Selected Preset (persists user's last choice)
+export function getSelectedPreset(): PresetId {
+  const preset = storage.getString(FOCUS_SELECTED_PRESET_KEY);
+  if (preset === "quick" || preset === "standard" || preset === "deep") {
+    return preset;
+  }
+  return "standard"; // Default
+}
+
+export function saveSelectedPreset(presetId: PresetId): void {
+  storage.set(FOCUS_SELECTED_PRESET_KEY, presetId);
+}
+
+// Reactive hook for focus settings
+export function useFocusSettings(): FocusSettings {
+  const [settings, setSettings] = useState<FocusSettings>(getFocusSettings());
+
+  useEffect(() => {
+    const listener = storage.addOnValueChangedListener((key) => {
+      if (key === FOCUS_SETTINGS_KEY) {
+        setSettings(getFocusSettings());
+      }
+    });
+
+    return () => {
+      listener.remove();
+    };
+  }, []);
+
+  return settings;
+}
+
+// Export focus data for backup
+export function exportFocusData(): string {
+  return JSON.stringify({
+    version: FOCUS_STORAGE_VERSION,
+    settings: getFocusSettings(),
+    sessions: getFocusHistory(),
+    exportedAt: new Date().toISOString(),
+  });
+}
+
+// Import focus data from backup
+export function importFocusData(jsonString: string): { success: boolean; error?: string } {
+  try {
+    const data = JSON.parse(jsonString);
+
+    if (!data.version || !data.sessions) {
+      return { success: false, error: "Invalid backup format" };
+    }
+
+    // Validate sessions
+    if (!Array.isArray(data.sessions)) {
+      return { success: false, error: "Sessions must be an array" };
+    }
+
+    // Import settings if present
+    if (data.settings) {
+      saveFocusSettings({ ...createDefaultSettings(), ...data.settings });
+    }
+
+    // Import sessions (replace existing)
+    saveFocusHistory(data.sessions);
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: "Failed to parse backup file" };
+  }
+}
+

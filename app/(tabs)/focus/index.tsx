@@ -1,0 +1,416 @@
+/**
+ * Focus Screen
+ *
+ * Main timer experience for Odak.
+ * Implements the hold-to-start ritual and break-the-seal quit mechanism.
+ *
+ * Layout is fixed to prevent content shift between phases.
+ */
+
+import React, { useCallback, useEffect, useReducer, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Alert,
+  Platform,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  FadeIn,
+  FadeOut,
+} from 'react-native-reanimated';
+import { useUnistyles } from 'react-native-unistyles';
+import * as Haptics from 'expo-haptics';
+
+// Domain
+import {
+  timerReducer,
+  getDisplayState,
+  createDefaultSettings,
+  restoreTimerState,
+  getPreset,
+  getAllPresets,
+  type TimerState,
+  type TimerEvent,
+  type FocusSettings,
+  type PresetId,
+} from '../../../domain';
+
+// Storage
+import {
+  getActiveTimer,
+  saveActiveTimer,
+  addFocusSession,
+  getFocusSettings,
+  getSelectedPreset,
+  saveSelectedPreset,
+} from '../../../utils/storage';
+
+// Components
+import { DotGrid } from '../../../components/focus/DotGrid';
+import { SwipeToFocus } from '../../../components/focus/SwipeToFocus';
+
+const TICK_INTERVAL = 1000; // 1 second
+
+export default function FocusScreen() {
+  const insets = useSafeAreaInsets();
+  const { theme } = useUnistyles();
+
+  // Settings (loaded once, updated via settings screen)
+  const [settings, setSettings] = useState<FocusSettings>(createDefaultSettings);
+
+  // Timer state
+  const [timerState, dispatch] = useReducer(
+    (state: TimerState, event: TimerEvent) => {
+      const result = timerReducer(state, event, settings);
+
+      // Handle side effects
+      if (result.session) {
+        addFocusSession(result.session);
+      }
+
+      // Persist active timer
+      saveActiveTimer(result.state.activeTimer);
+
+      return result.state;
+    },
+    null,
+    () => {
+      // Initialize from persisted state
+      const activeTimer = getActiveTimer();
+      const selectedPreset = getSelectedPreset();
+      return restoreTimerState(activeTimer, selectedPreset);
+    }
+  );
+
+  // Sub-minute progress (0-1 within current minute)
+  const [currentDotProgress, setCurrentDotProgress] = useState(0);
+
+  // Load settings on mount
+  useEffect(() => {
+    setSettings(getFocusSettings());
+  }, []);
+
+  // Tick timer for countdown updates
+  useEffect(() => {
+    if (timerState.phase === 'focusing' || timerState.phase === 'break') {
+      const interval = setInterval(() => {
+        dispatch({ type: 'TICK' });
+
+        // Calculate sub-minute progress
+        if (timerState.activeTimer) {
+          const now = Date.now();
+          const endsAt = new Date(timerState.activeTimer.endsAt).getTime();
+          const remainingMs = Math.max(0, endsAt - now);
+          const remainingSeconds = remainingMs / 1000;
+          const secondsInCurrentMinute = remainingSeconds % 60;
+          // Progress is inverted: 0 = full minute left, 1 = about to tick
+          const progress = 1 - (secondsInCurrentMinute / 60);
+          setCurrentDotProgress(progress);
+        }
+      }, TICK_INTERVAL);
+
+      return () => clearInterval(interval);
+    } else {
+      setCurrentDotProgress(0);
+    }
+  }, [timerState.phase, timerState.activeTimer]);
+
+  // Get display values
+  const displayState = getDisplayState(timerState, settings);
+  const selectedPreset = getPreset(timerState.selectedPresetId);
+  const allPresets = getAllPresets();
+
+  // Handlers
+  const handlePresetSelect = useCallback((presetId: PresetId) => {
+    dispatch({ type: 'SELECT_PRESET', presetId });
+    saveSelectedPreset(presetId);
+    if (Platform.OS === 'ios') {
+      Haptics.selectionAsync();
+    }
+  }, []);
+
+  const handleSwipeComplete = useCallback(() => {
+    // Directly start focusing when swipe is completed
+    dispatch({
+      type: 'HOLD_THRESHOLD_MET',
+      presetId: timerState.selectedPresetId,
+    });
+  }, [timerState.selectedPresetId]);
+
+  const handleBreakSeal = useCallback(() => {
+    dispatch({ type: 'BREAK_SEAL' });
+  }, []);
+
+  const handleConfirmEndEarly = useCallback(() => {
+    Alert.alert(
+      'End Session Early?',
+      'You still have time left. Are you sure you want to end this focus session?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => dispatch({ type: 'CANCEL_END_EARLY' }),
+        },
+        {
+          text: 'End Session',
+          style: 'destructive',
+          onPress: () => dispatch({ type: 'CONFIRM_END_EARLY' }),
+        },
+      ]
+    );
+  }, []);
+
+  const handleSkipBreak = useCallback(() => {
+    dispatch({ type: 'SKIP_BREAK' });
+  }, []);
+
+  // Show confirmation when in endedEarly phase
+  useEffect(() => {
+    if (timerState.phase === 'endedEarly') {
+      handleConfirmEndEarly();
+    }
+  }, [timerState.phase, handleConfirmEndEarly]);
+
+  // Phase checks
+  const isIdle = timerState.phase === 'idle';
+  const isFocusing = timerState.phase === 'focusing';
+  const isBreak = timerState.phase === 'break';
+  const isEndedEarly = timerState.phase === 'endedEarly';
+  const isActive = isFocusing || isBreak || isEndedEarly;
+
+  // Format time as mm:ss
+  const formatTime = (totalSeconds: number): string => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Background color for break mode
+  const backgroundColor = isBreak
+    ? theme.colors.systemOrange
+    : theme.colors.background;
+
+  const textColor = isBreak
+    ? '#FFFFFF'
+    : theme.colors.textPrimary;
+
+  const subtleTextColor = isBreak
+    ? 'rgba(255, 255, 255, 0.7)'
+    : theme.colors.textTertiary;
+
+  // Tab bar height estimate for bottom padding
+  const tabBarHeight = 90;
+
+  return (
+    <View style={[styles.container, { backgroundColor, paddingTop: insets.top }]}>
+      {/* Fixed Header - Always present to prevent layout shift */}
+      <View style={styles.header}>
+        {isActive ? (
+          /* Timer display during focus/break - shows mm:ss */
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            style={styles.timerHeader}
+          >
+            <Text style={[styles.timerText, { color: textColor }]}>
+              {formatTime(displayState.remainingSeconds)}
+            </Text>
+          </Animated.View>
+        ) : (
+          /* Preset selector (idle/holding) */
+          <View style={styles.presetSelector}>
+            {allPresets.map((preset) => (
+              <Pressable
+                key={preset.id}
+                onPress={() => handlePresetSelect(preset.id)}
+                style={[
+                  styles.presetButton,
+                  {
+                    backgroundColor:
+                      preset.id === timerState.selectedPresetId
+                        ? theme.colors.systemOrange
+                        : theme.isDark
+                        ? 'rgba(255,255,255,0.1)'
+                        : 'rgba(0,0,0,0.05)',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.presetText,
+                    {
+                      color:
+                        preset.id === timerState.selectedPresetId
+                          ? '#FFFFFF'
+                          : theme.colors.textPrimary,
+                    },
+                  ]}
+                >
+                  {preset.durationMinutes}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* Main content area - absolute positioning to prevent layout shift */}
+      <View style={[styles.content, { paddingBottom: tabBarHeight }]}>
+        {/* Break mode overlay */}
+        {isBreak && (
+          <View style={styles.breakOverlay}>
+            <DotGrid
+              rows={1}
+              cols={settings.breakDurationMinutes}
+              activeDots={displayState.litDots}
+              currentDotProgress={currentDotProgress}
+              isBreak
+            />
+
+            <Text style={styles.breakText}>
+              Take a break
+            </Text>
+
+            <Pressable onPress={handleSkipBreak} style={styles.skipButton}>
+              <Text style={styles.skipText}>Skip</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Focus grid - centered in content area */}
+        {!isBreak && (
+          <View style={styles.gridContainer}>
+            <DotGrid
+              rows={selectedPreset.gridRows}
+              cols={selectedPreset.gridCols}
+              activeDots={displayState.litDots}
+              currentDotProgress={isFocusing ? currentDotProgress : 0}
+            />
+          </View>
+        )}
+
+        {/* Focus control button - fixed position, changes based on state */}
+        {(isIdle || isFocusing) && (
+          <View style={styles.holdButtonContainer}>
+            <SwipeToFocus
+              mode={isIdle ? 'idle' : 'focusing'}
+              onComplete={isIdle ? handleSwipeComplete : handleBreakSeal}
+              disabled={isEndedEarly}
+              accessibilityLabel={isIdle
+                ? `Hold to start ${selectedPreset.durationMinutes} minute focus session`
+                : 'Hold to end focus session'
+              }
+            />
+          </View>
+        )}
+      </View>
+
+      {/* Debug info (dev only) */}
+      {__DEV__ && (
+        <View style={[styles.debugInfo, { bottom: tabBarHeight + 10 }]}>
+          <Text style={[styles.debugText, { color: subtleTextColor }]}>
+            {timerState.phase} • {Math.round(currentDotProgress * 100)}%
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    height: 80,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  presetSelector: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  presetButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presetText: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  timerHeader: {
+    alignItems: 'center',
+  },
+  timerText: {
+    fontSize: 48,
+    fontWeight: '200',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -1,
+  },
+  content: {
+    flex: 1,
+    position: 'relative',
+  },
+  // Grid is absolutely centered - never shifts position
+  gridContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 140, // Leave space for button at bottom
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Focus control button - fixed position above tab bar
+  holdButtonContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 92, // Above tab bar
+    alignItems: 'center',
+  },
+  // Break mode takes over the whole content area
+  breakOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 32,
+  },
+  breakText: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  skipButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 24,
+  },
+  skipText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  debugInfo: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  debugText: {
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+  },
+});

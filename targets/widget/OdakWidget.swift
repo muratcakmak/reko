@@ -4,7 +4,7 @@ import AppIntents
 
 // MARK: - Data Models
 
-struct RekoEventData: Codable, Identifiable, Hashable {
+struct OdakEventData: Codable, Identifiable, Hashable {
     let id: String
     let title: String
     let date: String?      // Used by AheadEvent
@@ -55,25 +55,25 @@ struct RekoEventData: Codable, Identifiable, Hashable {
 
 // MARK: - Storage Helper
 
-struct RekoStorage {
-    static let appGroupId = "group.com.omc345.rekoll"
+struct OdakStorage {
+    static let appGroupId = "group.com.omc345.odak"
 
-    static func loadAheadEvents() -> [RekoEventData] {
+    static func loadAheadEvents() -> [OdakEventData] {
         guard let userDefaults = UserDefaults(suiteName: appGroupId),
               let jsonString = userDefaults.string(forKey: "ahead_events"),
               let data = jsonString.data(using: .utf8) else { return [] }
-        return (try? JSONDecoder().decode([RekoEventData].self, from: data)) ?? []
+        return (try? JSONDecoder().decode([OdakEventData].self, from: data)) ?? []
     }
 
-    static func loadSinceEvents() -> [RekoEventData] {
+    static func loadSinceEvents() -> [OdakEventData] {
         guard let userDefaults = UserDefaults(suiteName: appGroupId),
               let jsonString = userDefaults.string(forKey: "since_events"),
               let data = jsonString.data(using: .utf8) else { return [] }
-        return (try? JSONDecoder().decode([RekoEventData].self, from: data)) ?? []
+        return (try? JSONDecoder().decode([OdakEventData].self, from: data)) ?? []
     }
 
     /// Load image from the App Group shared container
-    static func loadImage(for event: RekoEventData) -> UIImage? {
+    static func loadImage(for event: OdakEventData) -> UIImage? {
         guard let imagePath = event.image, !imagePath.isEmpty else { return nil }
 
         // Get the App Group container URL
@@ -125,16 +125,16 @@ struct AheadEventEntity: AppEntity {
 
 struct AheadEventQuery: EntityQuery {
     func entities(for identifiers: [String]) async throws -> [AheadEventEntity] {
-        let events = RekoStorage.loadAheadEvents()
+        let events = OdakStorage.loadAheadEvents()
         return events.filter { identifiers.contains($0.id) }.map { AheadEventEntity(id: $0.id, title: $0.title) }
     }
 
     func suggestedEntities() async throws -> [AheadEventEntity] {
-        return RekoStorage.loadAheadEvents().map { AheadEventEntity(id: $0.id, title: $0.title) }
+        return OdakStorage.loadAheadEvents().map { AheadEventEntity(id: $0.id, title: $0.title) }
     }
 
     func defaultResult() async -> AheadEventEntity? {
-        guard let first = RekoStorage.loadAheadEvents().first else { return nil }
+        guard let first = OdakStorage.loadAheadEvents().first else { return nil }
         return AheadEventEntity(id: first.id, title: first.title)
     }
 }
@@ -160,16 +160,16 @@ struct SinceEventEntity: AppEntity {
 
 struct SinceEventQuery: EntityQuery {
     func entities(for identifiers: [String]) async throws -> [SinceEventEntity] {
-        let events = RekoStorage.loadSinceEvents()
+        let events = OdakStorage.loadSinceEvents()
         return events.filter { identifiers.contains($0.id) }.map { SinceEventEntity(id: $0.id, title: $0.title) }
     }
 
     func suggestedEntities() async throws -> [SinceEventEntity] {
-        return RekoStorage.loadSinceEvents().map { SinceEventEntity(id: $0.id, title: $0.title) }
+        return OdakStorage.loadSinceEvents().map { SinceEventEntity(id: $0.id, title: $0.title) }
     }
 
     func defaultResult() async -> SinceEventEntity? {
-        guard let first = RekoStorage.loadSinceEvents().first else { return nil }
+        guard let first = OdakStorage.loadSinceEvents().first else { return nil }
         return SinceEventEntity(id: first.id, title: first.title)
     }
 }
@@ -194,29 +194,29 @@ struct SelectSinceEventIntent: WidgetConfigurationIntent {
 
 // MARK: - Timeline Entry
 
-struct RekoEventEntry: TimelineEntry {
+struct OdakEventEntry: TimelineEntry {
     let date: Date
-    let event: RekoEventData?
+    let event: OdakEventData?
     let daysCount: Int
     let isCountdown: Bool
     let backgroundImage: UIImage?
 
-    static func placeholder(isCountdown: Bool) -> RekoEventEntry {
-        RekoEventEntry(date: Date(), event: RekoEventData(id: "placeholder", title: "Event", date: "", startDate: nil, image: nil), daysCount: 42, isCountdown: isCountdown, backgroundImage: nil)
+    static func placeholder(isCountdown: Bool) -> OdakEventEntry {
+        OdakEventEntry(date: Date(), event: OdakEventData(id: "placeholder", title: "Event", date: "", startDate: nil, image: nil), daysCount: 42, isCountdown: isCountdown, backgroundImage: nil)
     }
 }
 
 // MARK: - Ahead Timeline Provider
 
 struct AheadEventProvider: AppIntentTimelineProvider {
-    func placeholder(in context: Context) -> RekoEventEntry { .placeholder(isCountdown: true) }
+    func placeholder(in context: Context) -> OdakEventEntry { .placeholder(isCountdown: true) }
 
-    func snapshot(for configuration: SelectAheadEventIntent, in context: Context) async -> RekoEventEntry {
+    func snapshot(for configuration: SelectAheadEventIntent, in context: Context) async -> OdakEventEntry {
         return getEntry(for: configuration)
     }
 
-    func timeline(for configuration: SelectAheadEventIntent, in context: Context) async -> Timeline<RekoEventEntry> {
-        var entries: [RekoEventEntry] = []
+    func timeline(for configuration: SelectAheadEventIntent, in context: Context) async -> Timeline<OdakEventEntry> {
+        var entries: [OdakEventEntry] = []
         let now = Date()
         for hour in 0..<24 {
             if let date = Calendar.current.date(byAdding: .hour, value: hour, to: now) {
@@ -226,12 +226,12 @@ struct AheadEventProvider: AppIntentTimelineProvider {
         return Timeline(entries: entries, policy: .atEnd)
     }
 
-    private func getEntry(for config: SelectAheadEventIntent, on date: Date = Date()) -> RekoEventEntry {
-        let events = RekoStorage.loadAheadEvents()
-        let event: RekoEventData? = config.event.flatMap { entity in events.first { $0.id == entity.id } } ?? events.first
+    private func getEntry(for config: SelectAheadEventIntent, on date: Date = Date()) -> OdakEventEntry {
+        let events = OdakStorage.loadAheadEvents()
+        let event: OdakEventData? = config.event.flatMap { entity in events.first { $0.id == entity.id } } ?? events.first
 
         guard let event = event else {
-            return RekoEventEntry(date: date, event: nil, daysCount: 0, isCountdown: true, backgroundImage: nil)
+            return OdakEventEntry(date: date, event: nil, daysCount: 0, isCountdown: true, backgroundImage: nil)
         }
 
         // Calculate days - use 0 if date parsing fails
@@ -240,22 +240,22 @@ struct AheadEventProvider: AppIntentTimelineProvider {
             days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: date), to: Calendar.current.startOfDay(for: targetDate)).day ?? 0
         }
 
-        let backgroundImage = RekoStorage.loadImage(for: event)
-        return RekoEventEntry(date: date, event: event, daysCount: max(0, days), isCountdown: true, backgroundImage: backgroundImage)
+        let backgroundImage = OdakStorage.loadImage(for: event)
+        return OdakEventEntry(date: date, event: event, daysCount: max(0, days), isCountdown: true, backgroundImage: backgroundImage)
     }
 }
 
 // MARK: - Since Timeline Provider
 
 struct SinceEventProvider: AppIntentTimelineProvider {
-    func placeholder(in context: Context) -> RekoEventEntry { .placeholder(isCountdown: false) }
+    func placeholder(in context: Context) -> OdakEventEntry { .placeholder(isCountdown: false) }
 
-    func snapshot(for configuration: SelectSinceEventIntent, in context: Context) async -> RekoEventEntry {
+    func snapshot(for configuration: SelectSinceEventIntent, in context: Context) async -> OdakEventEntry {
         return getEntry(for: configuration)
     }
 
-    func timeline(for configuration: SelectSinceEventIntent, in context: Context) async -> Timeline<RekoEventEntry> {
-        var entries: [RekoEventEntry] = []
+    func timeline(for configuration: SelectSinceEventIntent, in context: Context) async -> Timeline<OdakEventEntry> {
+        var entries: [OdakEventEntry] = []
         let now = Date()
         for hour in 0..<24 {
             if let date = Calendar.current.date(byAdding: .hour, value: hour, to: now) {
@@ -265,12 +265,12 @@ struct SinceEventProvider: AppIntentTimelineProvider {
         return Timeline(entries: entries, policy: .atEnd)
     }
 
-    private func getEntry(for config: SelectSinceEventIntent, on date: Date = Date()) -> RekoEventEntry {
-        let events = RekoStorage.loadSinceEvents()
-        let event: RekoEventData? = config.event.flatMap { entity in events.first { $0.id == entity.id } } ?? events.first
+    private func getEntry(for config: SelectSinceEventIntent, on date: Date = Date()) -> OdakEventEntry {
+        let events = OdakStorage.loadSinceEvents()
+        let event: OdakEventData? = config.event.flatMap { entity in events.first { $0.id == entity.id } } ?? events.first
 
         guard let event = event else {
-            return RekoEventEntry(date: date, event: nil, daysCount: 0, isCountdown: false, backgroundImage: nil)
+            return OdakEventEntry(date: date, event: nil, daysCount: 0, isCountdown: false, backgroundImage: nil)
         }
 
         // Calculate days - use 0 if date parsing fails
@@ -279,15 +279,15 @@ struct SinceEventProvider: AppIntentTimelineProvider {
             days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: targetDate), to: Calendar.current.startOfDay(for: date)).day ?? 0
         }
 
-        let backgroundImage = RekoStorage.loadImage(for: event)
-        return RekoEventEntry(date: date, event: event, daysCount: max(0, days), isCountdown: false, backgroundImage: backgroundImage)
+        let backgroundImage = OdakStorage.loadImage(for: event)
+        return OdakEventEntry(date: date, event: event, daysCount: max(0, days), isCountdown: false, backgroundImage: backgroundImage)
     }
 }
 
 // MARK: - Widget Views
 
 struct WidgetSmallView: View {
-    let entry: RekoEventEntry
+    let entry: OdakEventEntry
     @Environment(\.colorScheme) var colorScheme
 
     var accentColor: Color {
@@ -344,7 +344,7 @@ struct WidgetSmallView: View {
 }
 
 struct WidgetMediumView: View {
-    let entry: RekoEventEntry
+    let entry: OdakEventEntry
     @Environment(\.colorScheme) var colorScheme
 
     var accentColor: Color {
@@ -419,7 +419,7 @@ struct WidgetMediumView: View {
 }
 
 struct WidgetLargeView: View {
-    let entry: RekoEventEntry
+    let entry: OdakEventEntry
     @Environment(\.colorScheme) var colorScheme
 
     var accentColor: Color {
@@ -510,7 +510,7 @@ struct WidgetLargeView: View {
                     Image(systemName: "calendar.badge.plus")
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary)
-                    Text("Add an event in Rekoll")
+                    Text("Add an event in Odak")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -537,8 +537,8 @@ struct WidgetLargeView: View {
 
 // MARK: - Entry View
 
-struct RekollWidgetEntryView: View {
-    var entry: RekoEventEntry
+struct OdakWidgetEntryView: View {
+    var entry: OdakEventEntry
     @Environment(\.widgetFamily) var family
 
     var body: some View {
@@ -553,13 +553,13 @@ struct RekollWidgetEntryView: View {
 
 // MARK: - Ahead Widget
 
-struct RekoAheadWidget: Widget {
-    let kind = "RekoAheadWidget"
+struct OdakAheadWidget: Widget {
+    let kind = "OdakAheadWidget"
 
     var body: some WidgetConfiguration {
         AppIntentConfiguration(kind: kind, intent: SelectAheadEventIntent.self, provider: AheadEventProvider()) { entry in
-            RekollWidgetEntryView(entry: entry)
-                .widgetURL(entry.event != nil ? URL(string: "reko://event/\(entry.event!.id)") : URL(string: "reko://"))
+            OdakWidgetEntryView(entry: entry)
+                .widgetURL(entry.event != nil ? URL(string: "odak://event/\(entry.event!.id)") : URL(string: "odak://"))
         }
         .configurationDisplayName("Countdown")
         .description("Track days until your event")
@@ -569,13 +569,13 @@ struct RekoAheadWidget: Widget {
 
 // MARK: - Since Widget
 
-struct RekoSinceWidget: Widget {
-    let kind = "RekoSinceWidget"
+struct OdakSinceWidget: Widget {
+    let kind = "OdakSinceWidget"
 
     var body: some WidgetConfiguration {
         AppIntentConfiguration(kind: kind, intent: SelectSinceEventIntent.self, provider: SinceEventProvider()) { entry in
-            RekollWidgetEntryView(entry: entry)
-                .widgetURL(entry.event != nil ? URL(string: "reko://event/\(entry.event!.id)") : URL(string: "reko://"))
+            OdakWidgetEntryView(entry: entry)
+                .widgetURL(entry.event != nil ? URL(string: "odak://event/\(entry.event!.id)") : URL(string: "odak://"))
         }
         .configurationDisplayName("Milestone")
         .description("Track days since your event")
@@ -993,13 +993,13 @@ struct MonthWidgetEntryView: View {
 
 // MARK: - Year Widget
 
-struct RekoYearWidget: Widget {
-    let kind = "RekoYearWidget"
+struct OdakYearWidget: Widget {
+    let kind = "OdakYearWidget"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: YearProvider()) { entry in
             YearWidgetEntryView(entry: entry)
-                .widgetURL(URL(string: "reko://year"))
+                .widgetURL(URL(string: "odak://year"))
         }
         .configurationDisplayName("Year")
         .description("Shows how many days are left in the current year.")
@@ -1009,13 +1009,13 @@ struct RekoYearWidget: Widget {
 
 // MARK: - Month Widget
 
-struct RekoMonthWidget: Widget {
-    let kind = "RekoMonthWidget"
+struct OdakMonthWidget: Widget {
+    let kind = "OdakMonthWidget"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: MonthProvider()) { entry in
             MonthWidgetEntryView(entry: entry)
-                .widgetURL(URL(string: "reko://month"))
+                .widgetURL(URL(string: "odak://month"))
         }
         .configurationDisplayName("Month")
         .description("Shows how many days are left in the current month.")
@@ -1026,11 +1026,11 @@ struct RekoMonthWidget: Widget {
 // MARK: - Widget Bundle
 
 @main
-struct RekollWidgetBundle: WidgetBundle {
+struct OdakWidgetBundle: WidgetBundle {
     var body: some Widget {
-        RekoAheadWidget()
-        RekoSinceWidget()
-        RekoYearWidget()
-        RekoMonthWidget()
+        OdakAheadWidget()
+        OdakSinceWidget()
+        OdakYearWidget()
+        OdakMonthWidget()
     }
 }
